@@ -192,10 +192,15 @@ func (r *IbSendBwRunner) buildArgs(config Config) []string {
 			if freq, ok := value.(float64); ok {
 				args = append(args, "-F", fmt.Sprintf("%.2f", freq))
 			}
+		case "ib_dev":
+			// InfiniBand device
+			if dev, ok := value.(string); ok {
+				args = append(args, "--ib-dev", dev)
+			}
 		case "gid_index":
 			// GID index
 			if gid, ok := value.(int); ok {
-				args = append(args, "-x", strconv.Itoa(gid))
+				args = append(args, "--gid-index", strconv.Itoa(gid))
 			}
 		case "sl":
 			// Service level

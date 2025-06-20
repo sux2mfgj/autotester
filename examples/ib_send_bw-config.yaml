@@ -20,6 +20,8 @@ hosts:
         iterations: 1000
         tx_depth: 128
         rx_depth: 128
+        ib_dev: "mlx5_0"
+        gid_index: 3
 
   ib_client:
     ssh:
@@ -38,6 +40,8 @@ hosts:
         iterations: 1000
         tx_depth: 128
         rx_depth: 128
+        ib_dev: "mlx5_0"
+        gid_index: 3
 
 tests:
   - name: "IB Send BW - Basic Test"

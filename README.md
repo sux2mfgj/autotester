@@ -104,9 +104,12 @@ hosts:
       command_timeout: 300s
     role: "client|server"         # Optional role hint
     runner:                       # Host-specific runner config
-      port: 5201
+      port: 18515
       args:
-        format: "m"
+        size: 65536
+        iterations: 1000
+        ib_dev: "mlx5_0"
+        gid_index: 3
 ```
 
 ### Test Scenarios
@@ -187,6 +190,7 @@ Supported ib_send_bw arguments through `config.args`:
 | `qp` | int | Number of Queue Pairs |
 | `connection` | string | Connection type (RC/UC/UD) |
 | `inline` | int | Inline message size |
+| `ib_dev` | string | InfiniBand device name (e.g., "mlx5_0") |
 | `gid_index` | int | GID index to use |
 | `sl` | int | Service level |
 | `cpu_freq` | float | CPU frequency for cycle calculations |

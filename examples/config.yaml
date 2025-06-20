@@ -18,6 +18,8 @@ hosts:
       args:
         size: 65536
         iterations: 1000
+        ib_dev: "mlx5_0"
+        gid_index: 3
 
   ib_client:
     ssh:
@@ -34,6 +36,8 @@ hosts:
       args:
         size: 65536
         iterations: 1000
+        ib_dev: "mlx5_0"
+        gid_index: 3
 
 tests:
   - name: "Basic IB Send BW Test"
