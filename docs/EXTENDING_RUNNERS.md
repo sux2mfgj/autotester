@@ -1,6 +1,10 @@
-# Adding New Perftest Commands
+# Extending Runners - Adding New Test Tools
 
-This guide walks you through adding support for new perftest suite tools to the InfiniBand performance tester application. The modular architecture makes it straightforward to extend the system with new runners.
+This detailed technical guide walks you through adding support for new test tools to the performance testing framework. This document is intended for developers who want to extend the system with new runners.
+
+> **For general development information, see [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)**
+> 
+> **For user documentation, see [USER_GUIDE.md](USER_GUIDE.md)**
 
 ## Overview
 
