@@ -12,6 +12,10 @@ func NewValidator() *Validator {
 
 // ValidateConfig validates the entire configuration
 func (v *Validator) ValidateConfig(c *TestConfig) error {
+	if c == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+	
 	if c.Name == "" {
 		return fmt.Errorf("test name is required")
 	}
