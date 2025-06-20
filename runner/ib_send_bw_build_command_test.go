@@ -1,26 +1,24 @@
-package coordinator
+package runner
 
 import (
 	"strings"
 	"testing"
 	"time"
-
-	"tester/runner"
 )
 
 func TestIbSendBwRunner_BuildCommand(t *testing.T) {
 	// Create actual ib_send_bw runner instance
-	ibRunner := runner.NewIbSendBwRunner("")
+	ibRunner := NewIbSendBwRunner("")
 
 	tests := []struct {
 		name     string
-		config   runner.Config
+		config   Config
 		expected map[string]string // expected flags and their values
 		notExpected []string       // flags that should not be present
 	}{
 		{
 			name: "basic server config",
-			config: runner.Config{
+			config: Config{
 				Role: "server",
 				Port: 18515,
 				Args: map[string]interface{}{
@@ -37,7 +35,7 @@ func TestIbSendBwRunner_BuildCommand(t *testing.T) {
 		},
 		{
 			name: "basic client config",
-			config: runner.Config{
+			config: Config{
 				Role:       "client",
 				Host:       "192.168.1.100",
 				TargetHost: "10.0.0.100",
@@ -56,7 +54,7 @@ func TestIbSendBwRunner_BuildCommand(t *testing.T) {
 		},
 		{
 			name: "client with fallback to host",
-			config: runner.Config{
+			config: Config{
 				Role: "client",
 				Host: "192.168.1.100",
 				Port: 18515,
@@ -68,7 +66,7 @@ func TestIbSendBwRunner_BuildCommand(t *testing.T) {
 		},
 		{
 			name: "comprehensive config with all parameters",
-			config: runner.Config{
+			config: Config{
 				Role:     "client",
 				Host:     "192.168.1.100",
 				Port:     18515,
@@ -120,7 +118,7 @@ func TestIbSendBwRunner_BuildCommand(t *testing.T) {
 		},
 		{
 			name: "boolean flags disabled",
-			config: runner.Config{
+			config: Config{
 				Role: "server",
 				Args: map[string]interface{}{
 					"use_event":        false,
@@ -135,7 +133,7 @@ func TestIbSendBwRunner_BuildCommand(t *testing.T) {
 		},
 		{
 			name: "missing ib_dev parameter test",
-			config: runner.Config{
+			config: Config{
 				Role: "server",
 				Args: map[string]interface{}{
 					"size":      65536,
@@ -189,7 +187,7 @@ func TestIbSendBwRunner_ParameterCoverage(t *testing.T) {
 	// This test ensures that all parameters documented in RUNNER_PARAMETERS.md
 	// are actually implemented in the runner
 	
-	ibRunner := runner.NewIbSendBwRunner("")
+	ibRunner := NewIbSendBwRunner("")
 	
 	// Define all parameters that should be supported
 	allParameters := map[string]interface{}{
@@ -213,7 +211,7 @@ func TestIbSendBwRunner_ParameterCoverage(t *testing.T) {
 		"report_gbits":     true,
 	}
 	
-	config := runner.Config{
+	config := Config{
 		Role: "client",
 		Host: "192.168.1.100",
 		Port: 18515,
@@ -257,7 +255,7 @@ func TestIbSendBwRunner_ParameterCoverage(t *testing.T) {
 // TestRunner_Registry tests the runner registration system
 func TestRunner_Registry(t *testing.T) {
 	// Test that ib_send_bw is automatically registered
-	availableRunners := runner.GetRegistered()
+	availableRunners := GetRegistered()
 	
 	found := false
 	for _, name := range availableRunners {
@@ -272,7 +270,7 @@ func TestRunner_Registry(t *testing.T) {
 	}
 	
 	// Test creating runner from registry
-	runnerInstance, err := runner.Create("ib_send_bw")
+	runnerInstance, err := Create("ib_send_bw")
 	if err != nil {
 		t.Fatalf("Failed to create ib_send_bw runner: %v", err)
 	}
@@ -282,7 +280,7 @@ func TestRunner_Registry(t *testing.T) {
 	}
 	
 	// Test unknown runner
-	_, err = runner.Create("unknown_runner")
+	_, err = Create("unknown_runner")
 	if err == nil {
 		t.Error("Expected error for unknown runner")
 	}
@@ -290,16 +288,16 @@ func TestRunner_Registry(t *testing.T) {
 
 // TestIbSendBwRunner_EdgeCases tests edge cases and error conditions
 func TestIbSendBwRunner_EdgeCases(t *testing.T) {
-	ibRunner := runner.NewIbSendBwRunner("")
+	ibRunner := NewIbSendBwRunner("")
 	
 	tests := []struct {
 		name   string
-		config runner.Config
+		config Config
 		check  func(t *testing.T, cmd string)
 	}{
 		{
 			name: "zero port",
-			config: runner.Config{
+			config: Config{
 				Role: "server",
 				Port: 0,
 			},
@@ -311,7 +309,7 @@ func TestIbSendBwRunner_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "zero duration",
-			config: runner.Config{
+			config: Config{
 				Role:     "server",
 				Duration: 0,
 			},
@@ -323,7 +321,7 @@ func TestIbSendBwRunner_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "empty string values",
-			config: runner.Config{
+			config: Config{
 				Role: "server",
 				Args: map[string]interface{}{
 					"ib_dev":     "",
@@ -356,9 +354,9 @@ func TestIbSendBwRunner_RegressionIbDevBug(t *testing.T) {
 	// was missing from the command builder, causing it to not appear in
 	// generated commands even though it was configured.
 	
-	ibRunner := runner.NewIbSendBwRunner("")
+	ibRunner := NewIbSendBwRunner("")
 	
-	config := runner.Config{
+	config := Config{
 		Role: "server",
 		Args: map[string]interface{}{
 			"ib_dev":    "mlx5_0",
