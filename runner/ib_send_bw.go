@@ -184,8 +184,8 @@ func (r *IbSendBwRunner) BuildCommand(config Config) string {
 }
 
 
-// parseMetrics extracts performance metrics from ib_send_bw output
-func (r *IbSendBwRunner) parseMetrics(result *Result) {
+// ParseMetrics extracts performance metrics from ib_send_bw output
+func (r *IbSendBwRunner) ParseMetrics(result *Result) {
 	output := result.Output
 	lines := strings.Split(output, "\n")
 	

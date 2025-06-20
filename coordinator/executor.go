@@ -171,5 +171,8 @@ func (e *TestExecutor) runRemoteCommand(ctx context.Context, sshClient *ssh.Clie
 		Metrics:   make(map[string]interface{}),
 	}
 	
+	// Parse metrics from command output
+	r.ParseMetrics(runnerResult)
+	
 	return runnerResult, nil
 }

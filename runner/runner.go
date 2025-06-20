@@ -47,6 +47,9 @@ type Runner interface {
 	
 	// BuildCommand constructs the command line for remote execution
 	BuildCommand(config Config) string
+	
+	// ParseMetrics extracts performance metrics from command output
+	ParseMetrics(result *Result)
 }
 
 // Registry holds all registered runners
