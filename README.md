@@ -137,69 +137,7 @@ tests:
 |------|-------------|----------|
 | `ib_send_bw` | InfiniBand send bandwidth test | High-performance InfiniBand send testing |
 
-### ib_send_bw Configuration
-
-#### Network Configuration
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `target_host` | string | Specific IP address for client to connect to (overrides SSH host) |
-| `port` | int | Port number for the test |
-
-**Separate SSH and InfiniBand Networks:**
-
-In many HPC environments, SSH management traffic and InfiniBand traffic use different networks. You can configure different IPs:
-
-```yaml
-hosts:
-  ib_server:
-    ssh:
-      host: "192.168.1.100"    # Management network for SSH
-    runner:
-      # Server doesn't need target_host (listens on all interfaces)
-      
-  ib_client:
-    ssh:
-      host: "192.168.1.101"    # Management network for SSH  
-    runner:
-      target_host: "10.0.0.100"  # InfiniBand network IP for testing
-```
-
-You can also override `target_host` per test:
-
-```yaml
-tests:
-  - name: "Test with specific IB IP"
-    client: "ib_client"
-    server: "ib_server"
-    config:
-      target_host: "10.0.0.200"  # Override for this test
-```
-
-#### ib_send_bw Arguments
-
-Supported ib_send_bw arguments through `config.args`:
-
-| Argument | Type | Description |
-|----------|------|-------------|
-| `size` | int/string | Message size in bytes (e.g., 65536) |
-| `iterations` | int | Number of iterations to run |
-| `tx_depth` | int | Send queue depth |
-| `rx_depth` | int | Receive queue depth |
-| `mtu` | int | MTU size (e.g., 4096) |
-| `qp` | int | Number of Queue Pairs |
-| `connection` | string | Connection type (RC/UC/UD) |
-| `inline` | int | Inline message size |
-| `ib_dev` | string | InfiniBand device name (e.g., "mlx5_0") |
-| `gid_index` | int | GID index to use |
-| `sl` | int | Service level |
-| `cpu_freq` | float | CPU frequency for cycle calculations |
-| `use_event` | bool | Use event completion |
-| `bidirectional` | bool | Bidirectional test |
-| `report_cycles` | bool | Report CPU cycles |
-| `report_histogram` | bool | Report latency histogram |
-| `odp` | bool | Use On Demand Paging |
-| `report_gbits` | bool | Report in Gb/sec instead of MB/sec |
+For detailed runner parameter documentation, see [docs/RUNNER_PARAMETERS.md](docs/RUNNER_PARAMETERS.md).
 
 ## Command Line Options
 
@@ -219,91 +157,19 @@ Options:
         Show version information
 ```
 
-## Output Examples
+## Output Formats
 
-### Text Output
-```
-=== Test Results ===
-Total Duration: 45.2s
-Total Tests: 3
-Passed: 2
-Failed: 1
+The tool supports both human-readable text output and structured JSON output:
 
-1. IB Send BW Test - Basic
-   Status: ✓ PASS
-   Duration: 12.3s
-   Client: ✓ PASS
-   Client Metrics:
-     bandwidth_bps: 1.048576e+09
-     bandwidth_readable: 1000.00 MB/sec
-     message_rate_pps: 15625000
-   Server: ✓ PASS
+- **Text Output**: Displays test results in a readable format with status, duration, metrics, and detailed error information
+- **JSON Output**: Provides structured output suitable for parsing and integration with other tools
 
-2. IB Send BW Test - Failed
-   Status: ✗ FAIL
-   Duration: 2.1s
-   Client: ✗ FAIL
-     Client Error: SSH command execution failed: Process exited with status 1
-     Client Exit Code: 1
-     Client Output:
-       ib_send_bw: command not found
-   Server: ✗ FAIL
-     Server Error: SSH command execution failed: Process exited with status 127
-     Server Exit Code: 127
-     Server Output:
-       bash: ib_send_bw: command not found
-```
-
-### JSON Output
-```json
-{
-  "total_duration": "45.234567s",
-  "total_tests": 3,
-  "passed": 2,
-  "failed": 1,
-  "results": [
-    {
-      "scenario_name": "IB Send BW Test - Basic",
-      "success": true,
-      "duration": "12.345s",
-      "client_result": {
-        "success": true,
-        "exit_code": 0,
-        "duration": "12.1s",
-        "metrics": {
-          "bandwidth_bps": 1048576000,
-          "bandwidth_readable": "1000.00 MB/sec",
-          "message_rate_pps": 15625000
-        }
-      },
-      "server_result": {
-        "success": true,
-        "exit_code": 0,
-        "duration": "12.3s"
-      }
-    },
-    {
-      "scenario_name": "IB Send BW Test - Failed",
-      "success": false,
-      "duration": "2.1s",
-      "client_result": {
-        "success": false,
-        "exit_code": 127,
-        "duration": "2.0s",
-        "error": "SSH command execution failed: Process exited with status 127",
-        "output": "ib_send_bw: command not found"
-      },
-      "server_result": {
-        "success": false,
-        "exit_code": 127,
-        "duration": "2.1s",
-        "error": "SSH command execution failed: Process exited with status 127",
-        "output": "bash: ib_send_bw: command not found"
-      }
-    }
-  ]
-}
-```
+Use the `-json` flag to enable JSON output format. Both formats include:
+- Test execution status and timing
+- Command lines executed on each host  
+- Complete stdout/stderr output from tests
+- Parsed performance metrics
+- Detailed error information for failed tests
 
 ## Architecture
 
@@ -335,6 +201,9 @@ type Runner interface {
 
 2. Add command building logic to `CommandBuilder`
 3. Register the runner in `cli/app.go`
+4. Document parameters in [docs/RUNNER_PARAMETERS.md](docs/RUNNER_PARAMETERS.md)
+
+For detailed guidance, see [docs/ADDING_NEW_COMMANDS.md](docs/ADDING_NEW_COMMANDS.md).
 
 ### Adding New Output Formats
 

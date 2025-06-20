@@ -10,6 +10,7 @@ The tester uses a plugin-like architecture where each test tool is implemented a
 2. Add command building logic
 3. Register the new runner
 4. Update configuration examples
+5. Document parameters in [RUNNER_PARAMETERS.md](RUNNER_PARAMETERS.md)
 
 ## Step-by-Step Guide
 
@@ -344,17 +345,14 @@ tests:
         connection: "RC"
 ```
 
-### Step 5: Update Documentation
+### Step 5: Document Parameters
 
-Add the new tool to the README.md:
+Add the new tool's parameters to [RUNNER_PARAMETERS.md](RUNNER_PARAMETERS.md):
 
 ```markdown
-### Supported Test Tools
+## ib_read_bw Runner
 
-| Tool | Description | Roles |
-|------|-------------|--------|
-| ib_send_bw | InfiniBand send bandwidth test | client, server |
-| ib_read_bw | InfiniBand read bandwidth test | client, server |
+The `ib_read_bw` runner executes InfiniBand read bandwidth tests using the perftest suite.
 
 ### ib_read_bw Arguments
 
@@ -366,6 +364,23 @@ Add the new tool to the README.md:
 | `rx_depth` | int | Receive queue depth |
 | `connection` | string | Connection type (RC/UC/UD) |
 | `bidirectional` | bool | Bidirectional test |
+
+### Configuration Examples
+
+[Include configuration examples here]
+```
+
+### Step 6: Update Main Documentation
+
+Update the supported tools table in README.md:
+
+```markdown
+### Supported Test Tools
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `ib_send_bw` | InfiniBand send bandwidth test | High-performance InfiniBand send testing |
+| `ib_read_bw` | InfiniBand read bandwidth test | High-performance InfiniBand read testing |
 ```
 
 ## Advanced Features
