@@ -1,10 +1,17 @@
 # Runner Parameters Documentation
 
-This document describes the configuration parameters for each supported test runner.
+This document provides an overview of the configuration parameters for supported test runners. For comprehensive documentation including examples, troubleshooting, and best practices, see the individual runner guides:
 
-## ib_send_bw Runner
+- **[ib_send_bw Runner](runners/ib_send_bw.md)** - Complete InfiniBand send bandwidth testing guide
+- **[iperf3 Runner](runners/iperf3.md)** - Complete TCP/UDP network testing guide
+
+## Quick Reference
+
+### ib_send_bw Runner
 
 The `ib_send_bw` runner executes InfiniBand send bandwidth tests using the perftest suite.
+
+> **📖 For complete documentation, see [ib_send_bw Runner Guide](runners/ib_send_bw.md)**
 
 ### Network Configuration
 
@@ -240,9 +247,11 @@ ibping <ip>  # Client
 ibstatus
 ```
 
-## iperf3 Runner
+### iperf3 Runner
 
 The `iperf3` runner executes TCP/UDP network bandwidth tests using the industry-standard iperf3 tool.
+
+> **📖 For complete documentation, see [iperf3 Runner Guide](runners/iperf3.md)**
 
 ### Network Configuration
 
