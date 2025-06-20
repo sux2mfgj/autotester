@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -37,9 +36,6 @@ type Result struct {
 
 // Runner interface defines the contract for test program runners
 type Runner interface {
-	// Run executes the test program with the given configuration
-	Run(ctx context.Context, config Config) (*Result, error)
-	
 	// Validate checks if the configuration is valid for this runner
 	Validate(config Config) error
 	

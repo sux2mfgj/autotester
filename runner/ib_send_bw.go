@@ -1,13 +1,10 @@
 package runner
 
 import (
-	"context"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Auto-register the ib_send_bw runner
@@ -58,52 +55,6 @@ func (r *IbSendBwRunner) Validate(config Config) error {
 	return nil
 }
 
-// Run executes ib_send_bw with the given configuration
-func (r *IbSendBwRunner) Run(ctx context.Context, config Config) (*Result, error) {
-	if err := r.Validate(config); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-	
-	args := r.buildArgs(config)
-	
-	startTime := time.Now()
-	cmd := exec.CommandContext(ctx, r.executablePath, args...)
-	
-	// Set environment variables if specified
-	if len(config.Env) > 0 {
-		env := make([]string, 0, len(config.Env))
-		for k, v := range config.Env {
-			env = append(env, fmt.Sprintf("%s=%s", k, v))
-		}
-		cmd.Env = env
-	}
-	
-	output, err := cmd.CombinedOutput()
-	endTime := time.Now()
-	
-	result := &Result{
-		Success:   err == nil,
-		Output:    string(output),
-		Duration:  endTime.Sub(startTime),
-		StartTime: startTime,
-		EndTime:   endTime,
-		Metrics:   make(map[string]interface{}),
-	}
-	
-	if err != nil {
-		result.Error = err.Error()
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			result.ExitCode = exitErr.ExitCode()
-		}
-	}
-	
-	// Parse metrics from output
-	if result.Success {
-		r.parseMetrics(result)
-	}
-	
-	return result, nil
-}
 
 // BuildCommand constructs the full command line for remote execution
 func (r *IbSendBwRunner) BuildCommand(config Config) string {
@@ -117,7 +68,7 @@ func (r *IbSendBwRunner) BuildCommand(config Config) string {
 			targetHost = config.Host
 		}
 		if targetHost != "" {
-			cmd += fmt.Sprintf(" %s", targetHost)
+			cmd += " " + targetHost
 		}
 	}
 	
@@ -135,50 +86,94 @@ func (r *IbSendBwRunner) BuildCommand(config Config) string {
 	for key, value := range config.Args {
 		switch key {
 		case "size":
-			cmd += fmt.Sprintf(" -s %v", value)
+			// Message size in bytes
+			if size, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -s %d", size)
+			} else if sizeStr, ok := value.(string); ok {
+				cmd += fmt.Sprintf(" -s %s", sizeStr)
+			}
 		case "iterations":
-			cmd += fmt.Sprintf(" -n %v", value)
+			// Number of iterations
+			if iter, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -n %d", iter)
+			}
 		case "tx_depth":
-			cmd += fmt.Sprintf(" -t %v", value)
+			// Send queue depth
+			if depth, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -t %d", depth)
+			}
 		case "rx_depth":
-			cmd += fmt.Sprintf(" -r %v", value)
+			// Receive queue depth  
+			if depth, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -r %d", depth)
+			}
 		case "mtu":
-			cmd += fmt.Sprintf(" -m %v", value)
+			// MTU size
+			if mtu, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -m %d", mtu)
+			}
 		case "qp":
-			cmd += fmt.Sprintf(" -q %v", value)
+			// Number of QPs
+			if qp, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -q %d", qp)
+			}
 		case "connection":
-			cmd += fmt.Sprintf(" -c %v", value)
+			// Connection type (RC/UC/UD)
+			if conn, ok := value.(string); ok {
+				cmd += fmt.Sprintf(" -c %s", conn)
+			}
 		case "inline":
-			cmd += fmt.Sprintf(" -I %v", value)
+			// Inline size
+			if inline, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -I %d", inline)
+			}
 		case "ib_dev":
-			cmd += fmt.Sprintf(" -d %v", value)
+			// InfiniBand device
+			if dev, ok := value.(string); ok {
+				cmd += fmt.Sprintf(" -d %s", dev)
+			}
 		case "gid_index":
-			cmd += fmt.Sprintf(" -x %v", value)
+			// GID index
+			if gid, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -x %d", gid)
+			}
 		case "sl":
-			cmd += fmt.Sprintf(" -S %v", value)
+			// Service level
+			if sl, ok := value.(int); ok {
+				cmd += fmt.Sprintf(" -S %d", sl)
+			}
 		case "cpu_freq":
-			cmd += fmt.Sprintf(" -F %v", value)
+			// CPU frequency for cycles calculation
+			if freq, ok := value.(float64); ok {
+				cmd += fmt.Sprintf(" -F %.2f", freq)
+			}
 		case "use_event":
+			// Use event completion
 			if useEvent, ok := value.(bool); ok && useEvent {
 				cmd += " -e"
 			}
 		case "bidirectional":
+			// Bidirectional test
 			if bidir, ok := value.(bool); ok && bidir {
 				cmd += " -b"
 			}
 		case "report_cycles":
+			// Report CPU cycles
 			if cycles, ok := value.(bool); ok && cycles {
 				cmd += " -C"
 			}
 		case "report_histogram":
+			// Report latency histogram
 			if hist, ok := value.(bool); ok && hist {
 				cmd += " -H"
 			}
 		case "odp":
+			// Use On Demand Paging
 			if odp, ok := value.(bool); ok && odp {
 				cmd += " -o"
 			}
 		case "report_gbits":
+			// Report in Gb/sec instead of MB/sec
 			if gbits, ok := value.(bool); ok && gbits {
 				cmd += " -R"
 			}
@@ -188,130 +183,6 @@ func (r *IbSendBwRunner) BuildCommand(config Config) string {
 	return cmd
 }
 
-// buildArgs constructs the command line arguments for ib_send_bw
-func (r *IbSendBwRunner) buildArgs(config Config) []string {
-	args := make([]string, 0)
-	
-	// Server mode doesn't need a host argument, client does
-	if config.Role == "client" {
-		// Use TargetHost if specified, otherwise fall back to Host
-		targetHost := config.TargetHost
-		if targetHost == "" {
-			targetHost = config.Host
-		}
-		args = append(args, targetHost)
-	}
-	
-	// Port (if specified)
-	if config.Port > 0 {
-		args = append(args, "-p", strconv.Itoa(config.Port))
-	}
-	
-	// Duration (if specified) - ib_send_bw uses -D flag
-	if config.Duration > 0 {
-		args = append(args, "-D", strconv.Itoa(int(config.Duration.Seconds())))
-	}
-	
-	// Additional arguments from config
-	for key, value := range config.Args {
-		switch key {
-		case "size":
-			// Message size in bytes
-			if size, ok := value.(int); ok {
-				args = append(args, "-s", strconv.Itoa(size))
-			} else if sizeStr, ok := value.(string); ok {
-				args = append(args, "-s", sizeStr)
-			}
-		case "iterations":
-			// Number of iterations
-			if iter, ok := value.(int); ok {
-				args = append(args, "-n", strconv.Itoa(iter))
-			}
-		case "tx_depth":
-			// Send queue depth
-			if depth, ok := value.(int); ok {
-				args = append(args, "-t", strconv.Itoa(depth))
-			}
-		case "rx_depth":
-			// Receive queue depth  
-			if depth, ok := value.(int); ok {
-				args = append(args, "-r", strconv.Itoa(depth))
-			}
-		case "mtu":
-			// MTU size
-			if mtu, ok := value.(int); ok {
-				args = append(args, "-m", strconv.Itoa(mtu))
-			}
-		case "qp":
-			// Number of QPs
-			if qp, ok := value.(int); ok {
-				args = append(args, "-q", strconv.Itoa(qp))
-			}
-		case "connection":
-			// Connection type (RC/UC/UD)
-			if conn, ok := value.(string); ok {
-				args = append(args, "-c", conn)
-			}
-		case "inline":
-			// Inline size
-			if inline, ok := value.(int); ok {
-				args = append(args, "-I", strconv.Itoa(inline))
-			}
-		case "use_event":
-			// Use event completion
-			if useEvent, ok := value.(bool); ok && useEvent {
-				args = append(args, "-e")
-			}
-		case "bidirectional":
-			// Bidirectional test
-			if bidir, ok := value.(bool); ok && bidir {
-				args = append(args, "-b")
-			}
-		case "report_cycles":
-			// Report CPU cycles
-			if cycles, ok := value.(bool); ok && cycles {
-				args = append(args, "-C")
-			}
-		case "report_histogram":
-			// Report latency histogram
-			if hist, ok := value.(bool); ok && hist {
-				args = append(args, "-H")
-			}
-		case "cpu_freq":
-			// CPU frequency for cycles calculation
-			if freq, ok := value.(float64); ok {
-				args = append(args, "-F", fmt.Sprintf("%.2f", freq))
-			}
-		case "ib_dev":
-			// InfiniBand device
-			if dev, ok := value.(string); ok {
-				args = append(args, "-d", dev)
-			}
-		case "gid_index":
-			// GID index
-			if gid, ok := value.(int); ok {
-				args = append(args, "-x", strconv.Itoa(gid))
-			}
-		case "sl":
-			// Service level
-			if sl, ok := value.(int); ok {
-				args = append(args, "-S", strconv.Itoa(sl))
-			}
-		case "odp":
-			// Use On Demand Paging
-			if odp, ok := value.(bool); ok && odp {
-				args = append(args, "-o")
-			}
-		case "report_gbits":
-			// Report in Gb/sec instead of MB/sec
-			if gbits, ok := value.(bool); ok && gbits {
-				args = append(args, "-R")
-			}
-		}
-	}
-	
-	return args
-}
 
 // parseMetrics extracts performance metrics from ib_send_bw output
 func (r *IbSendBwRunner) parseMetrics(result *Result) {

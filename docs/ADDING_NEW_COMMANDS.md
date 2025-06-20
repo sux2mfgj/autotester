@@ -27,13 +27,10 @@ Create a new file in the `runner/` package for your tool. For example, let's add
 package runner
 
 import (
-	"context"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Auto-register the ib_read_bw runner
@@ -81,59 +78,6 @@ func (r *IbReadBwRunner) Validate(config Config) error {
 	return nil
 }
 
-// Run executes ib_read_bw with the given configuration
-func (r *IbReadBwRunner) Run(ctx context.Context, config Config) (*Result, error) {
-	if err := r.Validate(config); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-	
-	// Build command arguments (simplified for this example)
-	args := []string{}
-	if config.Role == "client" && config.Host != "" {
-		args = append(args, config.Host)
-	}
-	if config.Port > 0 {
-		args = append(args, "-p", strconv.Itoa(config.Port))
-	}
-	
-	startTime := time.Now()
-	cmd := exec.CommandContext(ctx, r.executablePath, args...)
-	
-	// Set environment variables if specified
-	if len(config.Env) > 0 {
-		env := make([]string, 0, len(config.Env))
-		for k, v := range config.Env {
-			env = append(env, fmt.Sprintf("%s=%s", k, v))
-		}
-		cmd.Env = env
-	}
-	
-	output, err := cmd.CombinedOutput()
-	endTime := time.Now()
-	
-	result := &Result{
-		Success:   err == nil,
-		Output:    string(output),
-		Duration:  endTime.Sub(startTime),
-		StartTime: startTime,
-		EndTime:   endTime,
-		Metrics:   make(map[string]interface{}),
-	}
-	
-	if err != nil {
-		result.Error = err.Error()
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			result.ExitCode = exitErr.ExitCode()
-		}
-	}
-	
-	// Parse metrics from output
-	if result.Success {
-		r.parseMetrics(result)
-	}
-	
-	return result, nil
-}
 
 // BuildCommand constructs the full command line for remote execution
 func (r *IbReadBwRunner) BuildCommand(config Config) string {
