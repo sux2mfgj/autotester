@@ -1,0 +1,145 @@
+name: "TCP Network Bandwidth Test with iperf3"
+description: "Test TCP network bandwidth using iperf3 across multiple scenarios"
+runner: "iperf3"
+timeout: 5m
+
+hosts:
+  tcp_server:
+    ssh:
+      host: "192.168.1.100"  # SSH connection host
+      port: 22
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+      connect_timeout: 30s
+      command_timeout: 300s
+    role: "server"
+    runner:
+      port: 5201  # iperf3 default port
+
+  tcp_client:
+    ssh:
+      host: "192.168.1.101"  # SSH connection host
+      port: 22
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+      connect_timeout: 30s
+      command_timeout: 300s
+    role: "client"
+    runner:
+      port: 5201
+      # target_host: "10.0.0.100"  # Optional: different network for testing (uncomment if needed)
+
+tests:
+  - name: "Basic TCP Bandwidth Test"
+    description: "Basic single-stream TCP bandwidth test"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      args:
+        parallel_streams: 1
+        window_size: "128K"
+
+  - name: "Multi-Stream TCP Test"
+    description: "TCP test with multiple parallel streams"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 60s
+      args:
+        parallel_streams: 4
+        window_size: "2M"
+        interval: 5
+
+  - name: "Large Window TCP Test"
+    description: "TCP test with large window size for high-speed networks"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      args:
+        parallel_streams: 8
+        window_size: "4M"
+        buffer_length: "256K"
+
+  - name: "Reverse Direction Test"
+    description: "Test download bandwidth (server to client)"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      args:
+        parallel_streams: 2
+        window_size: "1M"
+        reverse: true
+
+  - name: "Rate Limited Test"
+    description: "TCP test with bandwidth limit"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      args:
+        parallel_streams: 1
+        bitrate: "100M"  # Limit to 100 Mbps
+        window_size: "1M"
+
+  - name: "UDP Bandwidth Test"
+    description: "UDP bandwidth test for comparison"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      args:
+        protocol: "udp"
+        bitrate: "1G"  # UDP requires bitrate specification
+        parallel_streams: 1
+
+  - name: "TCP with Slow Start Omit"
+    description: "TCP test omitting initial slow start period"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 40s
+      args:
+        parallel_streams: 2
+        window_size: "2M"
+        omit_seconds: 5  # Skip first 5 seconds
+
+  - name: "IPv6 TCP Test"
+    description: "TCP bandwidth test using IPv6"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      args:
+        parallel_streams: 1
+        window_size: "1M"
+        ipv6: true
+
+  - name: "High Performance TCP"
+    description: "Optimized TCP test for high-speed networks"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 120s
+      args:
+        parallel_streams: 16
+        window_size: "8M"
+        buffer_length: "1M"
+        omit_seconds: 10
+        interval: 10
+    repeat: 3
+    delay: 30s
+
+  - name: "Custom Port Test"
+    description: "TCP test using custom port"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      target_host: "192.168.1.100"  # Override target for this test
+      args:
+        parallel_streams: 2
+        window_size: "1M"
+    # Note: This will use the port specified in host config (5201)
