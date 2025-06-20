@@ -87,7 +87,14 @@ func (r *IbReadBwRunner) Run(ctx context.Context, config Config) (*Result, error
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 	
-	args := r.buildArgs(config)
+	// Build command arguments (simplified for this example)
+	args := []string{}
+	if config.Role == "client" && config.Host != "" {
+		args = append(args, config.Host)
+	}
+	if config.Port > 0 {
+		args = append(args, "-p", strconv.Itoa(config.Port))
+	}
 	
 	startTime := time.Now()
 	cmd := exec.CommandContext(ctx, r.executablePath, args...)
@@ -170,57 +177,6 @@ func (r *IbReadBwRunner) BuildCommand(config Config) string {
 	return cmd
 }
 
-// buildArgs constructs the command line arguments for ib_read_bw
-func (r *IbReadBwRunner) buildArgs(config Config) []string {
-	args := make([]string, 0)
-	
-	// Server mode doesn't need a host argument, client does
-	if config.Role == "client" {
-		args = append(args, config.Host)
-	}
-	
-	// Port (if specified)
-	if config.Port > 0 {
-		args = append(args, "-p", strconv.Itoa(config.Port))
-	}
-	
-	// Duration (if specified) - ib_read_bw uses -D flag
-	if config.Duration > 0 {
-		args = append(args, "-D", strconv.Itoa(int(config.Duration.Seconds())))
-	}
-	
-	// Additional arguments from config
-	for key, value := range config.Args {
-		switch key {
-		case "size":
-			if size, ok := value.(int); ok {
-				args = append(args, "-s", strconv.Itoa(size))
-			}
-		case "iterations":
-			if iter, ok := value.(int); ok {
-				args = append(args, "-n", strconv.Itoa(iter))
-			}
-		case "tx_depth":
-			if depth, ok := value.(int); ok {
-				args = append(args, "-t", strconv.Itoa(depth))
-			}
-		case "rx_depth":
-			if depth, ok := value.(int); ok {
-				args = append(args, "-r", strconv.Itoa(depth))
-			}
-		case "connection":
-			if conn, ok := value.(string); ok {
-				args = append(args, "-c", conn)
-			}
-		case "bidirectional":
-			if bidir, ok := value.(bool); ok && bidir {
-				args = append(args, "-b")
-			}
-		}
-	}
-	
-	return args
-}
 
 // parseMetrics extracts performance metrics from ib_read_bw output
 func (r *IbReadBwRunner) parseMetrics(result *Result) {
@@ -259,65 +215,6 @@ func (r *IbReadBwRunner) parseMetrics(result *Result) {
 			}
 		}
 	}
-}
-```
-
-### Step 2: Add Command Building Logic
-
-Update the `CommandBuilder` to support your new tool:
-
-```go
-// coordinator/command_builder.go
-
-// Add this case to the BuildCommand method
-func (b *CommandBuilder) BuildCommand(r runner.Runner, config *runner.Config) string {
-	switch r.Name() {
-	case "ib_send_bw":
-		return b.buildIbSendBwCommand(config)
-	case "ib_read_bw":  // Add this case
-		return b.buildIbReadBwCommand(config)
-	default:
-		return ""
-	}
-}
-
-// Add this new method
-func (b *CommandBuilder) buildIbReadBwCommand(config *runner.Config) string {
-	cmd := "ib_read_bw"
-	
-	if config.Role == "client" {
-		cmd += fmt.Sprintf(" %s", config.Host)
-	}
-	
-	if config.Port > 0 {
-		cmd += fmt.Sprintf(" -p %d", config.Port)
-	}
-	
-	if config.Duration > 0 {
-		cmd += fmt.Sprintf(" -D %d", int(config.Duration.Seconds()))
-	}
-	
-	// Add other arguments from config.Args
-	for key, value := range config.Args {
-		switch key {
-		case "size":
-			cmd += fmt.Sprintf(" -s %v", value)
-		case "iterations":
-			cmd += fmt.Sprintf(" -n %v", value)
-		case "tx_depth":
-			cmd += fmt.Sprintf(" -t %v", value)
-		case "rx_depth":
-			cmd += fmt.Sprintf(" -r %v", value)
-		case "connection":
-			cmd += fmt.Sprintf(" -c %v", value)
-		case "bidirectional":
-			if bidir, ok := value.(bool); ok && bidir {
-				cmd += " -b"
-			}
-		}
-	}
-	
-	return cmd
 }
 ```
 
@@ -532,21 +429,31 @@ Here are some common perftest suite tools you might want to add:
 
 Each follows similar patterns but may have tool-specific arguments and output formats.
 
+## Benefits of the New Architecture
+
+**✅ High Modularity**: Each runner is completely self-contained
+**✅ Auto-Registration**: No need to modify CLI or coordinator code  
+**✅ Single Responsibility**: Each runner handles its own command building
+**✅ Fewer File Changes**: Adding a runner touches minimal files
+**✅ Better Testing**: Test actual runners, not mocks or separate builders
+
 ## Best Practices
 
-1. **Error Handling**: Always validate configurations and provide meaningful error messages
-2. **Timeouts**: Respect context cancellation and timeouts
-3. **Metrics**: Extract as much useful information as possible from perftest output
-4. **Documentation**: Update all relevant documentation
-5. **Testing**: Write comprehensive tests for your runner
-6. **Consistency**: Follow existing patterns in the codebase
+1. **Auto-Registration**: Always include the `init()` function with `Register()` call
+2. **Complete Interface**: Implement all Runner interface methods, especially `BuildCommand`
+3. **Error Handling**: Always validate configurations and provide meaningful error messages
+4. **Timeouts**: Respect context cancellation and timeouts
+5. **Metrics**: Extract as much useful information as possible from perftest output
+6. **Testing**: Write comprehensive tests for your runner
+7. **Consistency**: Follow existing patterns in the codebase
 
 ## Common Pitfalls
 
-1. **Command Injection**: Always validate and sanitize arguments
-2. **Platform Differences**: Consider different InfiniBand hardware configurations
-3. **Output Parsing**: Handle different perftest output formats and versions
-4. **Resource Cleanup**: Ensure proper cleanup of processes and resources
-5. **Error Propagation**: Don't swallow important error information
+1. **Forgetting Auto-Registration**: Don't forget the `init()` function
+2. **Command Injection**: Always validate and sanitize arguments
+3. **Platform Differences**: Consider different InfiniBand hardware configurations
+4. **Output Parsing**: Handle different perftest output formats and versions
+5. **Resource Cleanup**: Ensure proper cleanup of processes and resources
+6. **Error Propagation**: Don't swallow important error information
 
-The modular architecture makes it straightforward to add new perftest tools while maintaining consistency across the codebase.
+The streamlined, modular architecture makes it straightforward to add new perftest tools with minimal code changes and maximum maintainability.
