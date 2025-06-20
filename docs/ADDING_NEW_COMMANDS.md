@@ -122,8 +122,15 @@ func (r *IbReadBwRunner) BuildCommand(config Config) string {
 }
 
 
-// parseMetrics extracts performance metrics from ib_read_bw output
-func (r *IbReadBwRunner) parseMetrics(result *Result) {
+// ParseMetrics extracts performance metrics from ib_read_bw output
+func (r *IbReadBwRunner) ParseMetrics(result *Result) error {
+	if result == nil {
+		return fmt.Errorf("result cannot be nil")
+	}
+	
+	if result.Metrics == nil {
+		result.Metrics = make(map[string]interface{})
+	}
 	output := result.Output
 	
 	// Parse bandwidth (similar format to ib_send_bw)
@@ -159,6 +166,8 @@ func (r *IbReadBwRunner) parseMetrics(result *Result) {
 			}
 		}
 	}
+	
+	return nil
 }
 ```
 
