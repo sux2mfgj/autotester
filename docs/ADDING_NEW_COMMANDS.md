@@ -1,0 +1,506 @@
+# Adding New Perftest Commands
+
+This guide walks you through adding support for new perftest suite tools to the InfiniBand performance tester application. The modular architecture makes it straightforward to extend the system with new runners.
+
+## Overview
+
+The tester uses a plugin-like architecture where each test tool is implemented as a `Runner`. To add a new command, you need to:
+
+1. Implement the `Runner` interface
+2. Add command building logic
+3. Register the new runner
+4. Update configuration examples
+
+## Step-by-Step Guide
+
+### Step 1: Implement the Runner Interface
+
+Create a new file in the `runner/` package for your tool. For example, let's add support for `ib_read_bw`:
+
+```go
+// runner/ib_read_bw.go
+package runner
+
+import (
+	"context"
+	"fmt"
+	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// IbReadBwRunner implements the Runner interface for ib_read_bw
+type IbReadBwRunner struct {
+	executablePath string
+}
+
+// NewIbReadBwRunner creates a new ib_read_bw runner
+func NewIbReadBwRunner(executablePath string) *IbReadBwRunner {
+	if executablePath == "" {
+		executablePath = "ib_read_bw"
+	}
+	return &IbReadBwRunner{
+		executablePath: executablePath,
+	}
+}
+
+// Name returns the name of the runner
+func (r *IbReadBwRunner) Name() string {
+	return "ib_read_bw"
+}
+
+// SupportsRole returns true if the runner supports the given role
+func (r *IbReadBwRunner) SupportsRole(role string) bool {
+	return role == "client" || role == "server"
+}
+
+// Validate checks if the configuration is valid for ib_read_bw
+func (r *IbReadBwRunner) Validate(config Config) error {
+	if !r.SupportsRole(config.Role) {
+		return fmt.Errorf("unsupported role: %s", config.Role)
+	}
+	
+	if config.Role == "client" && config.Host == "" {
+		return fmt.Errorf("host is required for client role")
+	}
+	
+	return nil
+}
+
+// Run executes ib_read_bw with the given configuration
+func (r *IbReadBwRunner) Run(ctx context.Context, config Config) (*Result, error) {
+	if err := r.Validate(config); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+	
+	args := r.buildArgs(config)
+	
+	startTime := time.Now()
+	cmd := exec.CommandContext(ctx, r.executablePath, args...)
+	
+	// Set environment variables if specified
+	if len(config.Env) > 0 {
+		env := make([]string, 0, len(config.Env))
+		for k, v := range config.Env {
+			env = append(env, fmt.Sprintf("%s=%s", k, v))
+		}
+		cmd.Env = env
+	}
+	
+	output, err := cmd.CombinedOutput()
+	endTime := time.Now()
+	
+	result := &Result{
+		Success:   err == nil,
+		Output:    string(output),
+		Duration:  endTime.Sub(startTime),
+		StartTime: startTime,
+		EndTime:   endTime,
+		Metrics:   make(map[string]interface{}),
+	}
+	
+	if err != nil {
+		result.Error = err.Error()
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			result.ExitCode = exitErr.ExitCode()
+		}
+	}
+	
+	// Parse metrics from output
+	if result.Success {
+		r.parseMetrics(result)
+	}
+	
+	return result, nil
+}
+
+// buildArgs constructs the command line arguments for ib_read_bw
+func (r *IbReadBwRunner) buildArgs(config Config) []string {
+	args := make([]string, 0)
+	
+	// Server mode doesn't need a host argument, client does
+	if config.Role == "client" {
+		args = append(args, config.Host)
+	}
+	
+	// Port (if specified)
+	if config.Port > 0 {
+		args = append(args, "-p", strconv.Itoa(config.Port))
+	}
+	
+	// Duration (if specified) - ib_read_bw uses -D flag
+	if config.Duration > 0 {
+		args = append(args, "-D", strconv.Itoa(int(config.Duration.Seconds())))
+	}
+	
+	// Additional arguments from config
+	for key, value := range config.Args {
+		switch key {
+		case "size":
+			if size, ok := value.(int); ok {
+				args = append(args, "-s", strconv.Itoa(size))
+			}
+		case "iterations":
+			if iter, ok := value.(int); ok {
+				args = append(args, "-n", strconv.Itoa(iter))
+			}
+		case "tx_depth":
+			if depth, ok := value.(int); ok {
+				args = append(args, "-t", strconv.Itoa(depth))
+			}
+		case "rx_depth":
+			if depth, ok := value.(int); ok {
+				args = append(args, "-r", strconv.Itoa(depth))
+			}
+		case "connection":
+			if conn, ok := value.(string); ok {
+				args = append(args, "-c", conn)
+			}
+		case "bidirectional":
+			if bidir, ok := value.(bool); ok && bidir {
+				args = append(args, "-b")
+			}
+		}
+	}
+	
+	return args
+}
+
+// parseMetrics extracts performance metrics from ib_read_bw output
+func (r *IbReadBwRunner) parseMetrics(result *Result) {
+	output := result.Output
+	
+	// Parse bandwidth (similar format to ib_send_bw)
+	// Example: "1000.00 MB/sec" or "8.00 Gb/sec"
+	bandwidthRegex := regexp.MustCompile(`(\d+\.?\d*)\s*(MB/sec|Gb/sec|GB/sec)`)
+	if matches := bandwidthRegex.FindStringSubmatch(output); len(matches) >= 3 {
+		if bw, err := strconv.ParseFloat(matches[1], 64); err == nil {
+			unit := matches[2]
+			switch unit {
+			case "MB/sec":
+				result.Metrics["bandwidth_mbps"] = bw
+				result.Metrics["bandwidth_bps"] = bw * 1e6 * 8
+			case "GB/sec":
+				result.Metrics["bandwidth_gbps"] = bw
+				result.Metrics["bandwidth_bps"] = bw * 1e9 * 8
+			case "Gb/sec":
+				result.Metrics["bandwidth_gbps"] = bw
+				result.Metrics["bandwidth_bps"] = bw * 1e9
+			}
+			result.Metrics["bandwidth_readable"] = matches[0]
+		}
+	}
+	
+	// Parse connection information
+	if strings.Contains(output, "Connection type:") {
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "Connection type:") {
+				parts := strings.Split(line, ":")
+				if len(parts) > 1 {
+					result.Metrics["connection_type"] = strings.TrimSpace(parts[1])
+				}
+			}
+		}
+	}
+}
+```
+
+### Step 2: Add Command Building Logic
+
+Update the `CommandBuilder` to support your new tool:
+
+```go
+// coordinator/command_builder.go
+
+// Add this case to the BuildCommand method
+func (b *CommandBuilder) BuildCommand(r runner.Runner, config *runner.Config) string {
+	switch r.Name() {
+	case "ib_send_bw":
+		return b.buildIbSendBwCommand(config)
+	case "ib_read_bw":  // Add this case
+		return b.buildIbReadBwCommand(config)
+	default:
+		return ""
+	}
+}
+
+// Add this new method
+func (b *CommandBuilder) buildIbReadBwCommand(config *runner.Config) string {
+	cmd := "ib_read_bw"
+	
+	if config.Role == "client" {
+		cmd += fmt.Sprintf(" %s", config.Host)
+	}
+	
+	if config.Port > 0 {
+		cmd += fmt.Sprintf(" -p %d", config.Port)
+	}
+	
+	if config.Duration > 0 {
+		cmd += fmt.Sprintf(" -D %d", int(config.Duration.Seconds()))
+	}
+	
+	// Add other arguments from config.Args
+	for key, value := range config.Args {
+		switch key {
+		case "size":
+			cmd += fmt.Sprintf(" -s %v", value)
+		case "iterations":
+			cmd += fmt.Sprintf(" -n %v", value)
+		case "tx_depth":
+			cmd += fmt.Sprintf(" -t %v", value)
+		case "rx_depth":
+			cmd += fmt.Sprintf(" -r %v", value)
+		case "connection":
+			cmd += fmt.Sprintf(" -c %v", value)
+		case "bidirectional":
+			if bidir, ok := value.(bool); ok && bidir {
+				cmd += " -b"
+			}
+		}
+	}
+	
+	return cmd
+}
+```
+
+### Step 3: Register the New Runner
+
+Add registration logic in the CLI application:
+
+```go
+// cli/app.go
+
+// Update the registerRunners method
+func (a *App) registerRunners(coord *coordinator.Coordinator, cfg *config.TestConfig) error {
+	switch cfg.Runner {
+	case "ib_send_bw":
+		ibSendBwRunner := runner.NewIbSendBwRunner("")
+		coord.RegisterRunner("ib_send_bw", ibSendBwRunner)
+	case "ib_read_bw":  // Add this case
+		ibReadBwRunner := runner.NewIbReadBwRunner("")
+		coord.RegisterRunner("ib_read_bw", ibReadBwRunner)
+	default:
+		return fmt.Errorf("unsupported runner: %s", cfg.Runner)
+	}
+	
+	return nil
+}
+```
+
+### Step 4: Create Configuration Examples
+
+Add example configurations for the new tool:
+
+```yaml
+# examples/ib_read_bw-config.yaml
+name: "InfiniBand Read Bandwidth Test"
+description: "Test InfiniBand read bandwidth using ib_read_bw"
+runner: "ib_read_bw"
+timeout: 5m
+
+hosts:
+  ib_server:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    runner:
+      port: 18515
+
+  ib_client:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+
+tests:
+  - name: "IB Read BW Test"
+    description: "Basic InfiniBand read bandwidth test"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 30s
+      args:
+        size: 65536      # 64KB messages
+        iterations: 1000
+        connection: "RC"
+
+  - name: "IB Read BW Bidirectional"
+    description: "Bidirectional read bandwidth test"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 60s
+      args:
+        size: 131072     # 128KB messages
+        iterations: 500
+        bidirectional: true
+        connection: "RC"
+```
+
+### Step 5: Update Documentation
+
+Add the new tool to the README.md:
+
+```markdown
+### Supported Test Tools
+
+| Tool | Description | Roles |
+|------|-------------|--------|
+| ib_send_bw | InfiniBand send bandwidth test | client, server |
+| ib_read_bw | InfiniBand read bandwidth test | client, server |
+
+### ib_read_bw Arguments
+
+| Argument | Type | Description |
+|----------|------|-------------|
+| `size` | int | Message size in bytes |
+| `iterations` | int | Number of iterations to run |
+| `tx_depth` | int | Send queue depth |
+| `rx_depth` | int | Receive queue depth |
+| `connection` | string | Connection type (RC/UC/UD) |
+| `bidirectional` | bool | Bidirectional test |
+```
+
+## Advanced Features
+
+### Custom Argument Parsing
+
+For tools with complex argument structures, you can implement custom parsing:
+
+```go
+func (r *CustomPerfTestRunner) buildComplexArgs(config Config) []string {
+	args := []string{r.executablePath}
+	
+	// Handle nested configurations
+	if perfConfig, ok := config.Args["performance"].(map[string]interface{}); ok {
+		if queueDepth, ok := perfConfig["queue_depth"].(int); ok {
+			args = append(args, "-q", strconv.Itoa(queueDepth))
+		}
+		if mtu, ok := perfConfig["mtu"].(int); ok {
+			args = append(args, "--mtu", strconv.Itoa(mtu))
+		}
+	}
+	
+	return args
+}
+```
+
+### Custom Metrics Parsing
+
+Implement sophisticated output parsing for complex perftest tools:
+
+```go
+func (r *CustomPerfTestRunner) parseAdvancedMetrics(result *Result) {
+	lines := strings.Split(result.Output, "\n")
+	
+	for _, line := range lines {
+		// Parse structured perftest output
+		if strings.HasPrefix(line, "#bytes") {
+			// Handle perftest table headers
+			continue
+		}
+		
+		// Parse data lines
+		fields := strings.Fields(line)
+		if len(fields) >= 4 {
+			if bytes, err := strconv.ParseInt(fields[0], 10, 64); err == nil {
+				result.Metrics["message_size"] = bytes
+			}
+			if bw, err := strconv.ParseFloat(fields[2], 64); err == nil {
+				result.Metrics["bandwidth_peak"] = bw
+			}
+		}
+	}
+}
+```
+
+## Testing Your New Runner
+
+### Unit Tests
+
+Create unit tests for your runner:
+
+```go
+// runner/ib_read_bw_test.go
+package runner
+
+import (
+	"context"
+	"testing"
+	"time"
+)
+
+func TestIbReadBwRunner_Validate(t *testing.T) {
+	runner := NewIbReadBwRunner("")
+	
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+	}{
+		{
+			name: "valid client config",
+			config: Config{
+				Role: "client",
+				Host: "example.com",
+				Port: 18515,
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid role",
+			config: Config{
+				Role: "invalid",
+			},
+			wantErr: true,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runner.Validate(tt.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+```
+
+## Common Perftest Tools to Add
+
+Here are some common perftest suite tools you might want to add:
+
+1. **ib_write_bw** - InfiniBand write bandwidth test
+2. **ib_atomic_bw** - InfiniBand atomic operations bandwidth test
+3. **ib_read_lat** - InfiniBand read latency test
+4. **ib_write_lat** - InfiniBand write latency test
+5. **ib_send_lat** - InfiniBand send latency test
+
+Each follows similar patterns but may have tool-specific arguments and output formats.
+
+## Best Practices
+
+1. **Error Handling**: Always validate configurations and provide meaningful error messages
+2. **Timeouts**: Respect context cancellation and timeouts
+3. **Metrics**: Extract as much useful information as possible from perftest output
+4. **Documentation**: Update all relevant documentation
+5. **Testing**: Write comprehensive tests for your runner
+6. **Consistency**: Follow existing patterns in the codebase
+
+## Common Pitfalls
+
+1. **Command Injection**: Always validate and sanitize arguments
+2. **Platform Differences**: Consider different InfiniBand hardware configurations
+3. **Output Parsing**: Handle different perftest output formats and versions
+4. **Resource Cleanup**: Ensure proper cleanup of processes and resources
+5. **Error Propagation**: Don't swallow important error information
+
+The modular architecture makes it straightforward to add new perftest tools while maintaining consistency across the codebase.

@@ -1,0 +1,48 @@
+package runner
+
+import (
+	"context"
+	"time"
+)
+
+// Config represents the configuration for a test run
+type Config struct {
+	// Common fields
+	Duration time.Duration            `yaml:"duration"`
+	Args     map[string]interface{}   `yaml:"args"`
+	Env      map[string]string        `yaml:"env"`
+	
+	// Role-specific settings
+	Role     string                   `yaml:"role"` // "client" or "server"
+	
+	// Network settings
+	Host     string                   `yaml:"host"`
+	Port     int                      `yaml:"port"`
+}
+
+// Result represents the result of a test execution
+type Result struct {
+	Success    bool                     `json:"success"`
+	Output     string                   `json:"output"`
+	Error      string                   `json:"error,omitempty"`
+	ExitCode   int                      `json:"exit_code"`
+	Duration   time.Duration            `json:"duration"`
+	Metrics    map[string]interface{}   `json:"metrics,omitempty"`
+	StartTime  time.Time                `json:"start_time"`
+	EndTime    time.Time                `json:"end_time"`
+}
+
+// Runner interface defines the contract for test program runners
+type Runner interface {
+	// Run executes the test program with the given configuration
+	Run(ctx context.Context, config Config) (*Result, error)
+	
+	// Validate checks if the configuration is valid for this runner
+	Validate(config Config) error
+	
+	// Name returns the name of the runner
+	Name() string
+	
+	// SupportsRole returns true if the runner supports the given role
+	SupportsRole(role string) bool
+}

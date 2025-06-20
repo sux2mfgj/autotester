@@ -1,0 +1,88 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+tester
+tester.exe
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Logs
+*.log
+logs/
+
+# Configuration files with sensitive data
+config.yaml
+*.config.yaml
+secrets.yaml
+.env
+.env.local
+
+# SSH keys (if accidentally placed in project)
+*.pem
+*.key
+id_rsa*
+*.pub
+
+# Test results and coverage
+coverage.txt
+coverage.html
+test-results.xml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+build/
+dist/
+bin/
+
+# Debug files
+debug
+debug.test
+
+# Profiling data
+*.prof
+*.pprof
+
+# Documentation build artifacts
+docs/_build/
+site/
+
+# Example configs are OK, but not actual configs
+!examples/config.yaml
+!examples/*.yaml

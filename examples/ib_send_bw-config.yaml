@@ -1,0 +1,156 @@
+name: "InfiniBand Send Bandwidth Test"
+description: "Test InfiniBand send bandwidth using ib_send_bw from perftest suite"
+runner: "ib_send_bw"
+timeout: 10m
+
+hosts:
+  ib_server:
+    ssh:
+      host: "192.168.1.100"
+      port: 22
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+      connect_timeout: 30s
+      command_timeout: 600s
+    role: "server"
+    runner:
+      port: 18515  # Default ib_send_bw port
+      args:
+        size: 65536  # 64KB message size
+        iterations: 1000
+        tx_depth: 128
+        rx_depth: 128
+
+  ib_client:
+    ssh:
+      host: "192.168.1.101"
+      port: 22
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+      connect_timeout: 30s
+      command_timeout: 600s
+    role: "client"
+    runner:
+      port: 18515
+      args:
+        size: 65536
+        iterations: 1000
+        tx_depth: 128
+        rx_depth: 128
+
+tests:
+  - name: "IB Send BW - Basic Test"
+    description: "Basic InfiniBand send bandwidth test with default parameters"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 30s
+      args:
+        size: 4096        # 4KB messages
+        iterations: 5000
+        connection: "RC"   # Reliable Connection
+        
+  - name: "IB Send BW - Large Messages"
+    description: "Test with large message sizes"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 60s
+      args:
+        size: 1048576     # 1MB messages
+        iterations: 1000
+        connection: "RC"
+        tx_depth: 64
+        rx_depth: 64
+        
+  - name: "IB Send BW - Multiple QPs"
+    description: "Test with multiple Queue Pairs"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 45s
+      args:
+        size: 65536      # 64KB messages
+        iterations: 2000
+        qp: 4            # 4 Queue Pairs
+        connection: "RC"
+        tx_depth: 128
+        
+  - name: "IB Send BW - Bidirectional"
+    description: "Bidirectional bandwidth test"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 60s
+      args:
+        size: 32768      # 32KB messages
+        iterations: 3000
+        bidirectional: true
+        connection: "RC"
+        
+  - name: "IB Send BW - Performance Analysis"
+    description: "Detailed performance analysis with cycles and histogram"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 120s
+      args:
+        size: 8192       # 8KB messages
+        iterations: 10000
+        connection: "RC"
+        report_cycles: true
+        report_histogram: true
+        cpu_freq: 2.4    # CPU frequency in GHz
+        
+  - name: "IB Send BW - Different MTU"
+    description: "Test with different MTU sizes"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 30s
+      args:
+        size: 4096
+        iterations: 5000
+        mtu: 4096        # 4KB MTU
+        connection: "RC"
+        
+  - name: "IB Send BW - Event Completion"
+    description: "Test using event completion instead of polling"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 30s
+      args:
+        size: 16384      # 16KB messages
+        iterations: 2000
+        use_event: true  # Use event completion
+        connection: "RC"
+        
+  - name: "IB Send BW - Unreliable Connection"
+    description: "Test with Unreliable Connection"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 30s
+      args:
+        size: 2048       # 2KB messages
+        iterations: 10000
+        connection: "UC" # Unreliable Connection
+        
+  - name: "IB Send BW - High Performance"
+    description: "High performance test with optimized settings"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 300s   # 5 minutes
+      args:
+        size: 131072     # 128KB messages
+        iterations: 50000
+        tx_depth: 256    # Deeper queues
+        rx_depth: 256
+        qp: 8            # Multiple QPs
+        inline: 64       # Inline small messages
+        connection: "RC"
+        report_gbits: true  # Report in Gb/sec
+    repeat: 3
+    delay: 10s

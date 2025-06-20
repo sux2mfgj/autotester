@@ -1,0 +1,58 @@
+name: "Default InfiniBand Performance Test"
+description: "Default configuration for InfiniBand performance testing using ib_send_bw"
+runner: "ib_send_bw"
+timeout: 5m
+
+hosts:
+  ib_server:
+    ssh:
+      host: "192.168.1.100"
+      port: 22
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+      connect_timeout: 30s
+      command_timeout: 300s
+    role: "server"
+    runner:
+      port: 18515
+      args:
+        size: 65536
+        iterations: 1000
+
+  ib_client:
+    ssh:
+      host: "192.168.1.101"
+      port: 22
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+      connect_timeout: 30s
+      command_timeout: 300s
+    role: "client"
+    runner:
+      port: 18515
+      args:
+        size: 65536
+        iterations: 1000
+
+tests:
+  - name: "Basic IB Send BW Test"
+    description: "Basic InfiniBand send bandwidth test"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 30s
+      args:
+        size: 4096
+        iterations: 5000
+        connection: "RC"
+
+  - name: "Large Message Test"
+    description: "Test with larger message sizes"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 60s
+      args:
+        size: 1048576  # 1MB
+        iterations: 1000
+        connection: "RC"
