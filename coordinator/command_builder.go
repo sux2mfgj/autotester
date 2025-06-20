@@ -68,6 +68,8 @@ func (b *CommandBuilder) buildIbSendBwCommand(config *runner.Config) string {
 			cmd += fmt.Sprintf(" -c %v", value)
 		case "inline":
 			cmd += fmt.Sprintf(" -I %v", value)
+		case "ib_dev":
+			cmd += fmt.Sprintf(" -d %v", value)
 		case "gid_index":
 			cmd += fmt.Sprintf(" -x %v", value)
 		case "sl":

@@ -195,12 +195,12 @@ func (r *IbSendBwRunner) buildArgs(config Config) []string {
 		case "ib_dev":
 			// InfiniBand device
 			if dev, ok := value.(string); ok {
-				args = append(args, "--ib-dev", dev)
+				args = append(args, "-d", dev)
 			}
 		case "gid_index":
 			// GID index
 			if gid, ok := value.(int); ok {
-				args = append(args, "--gid-index", strconv.Itoa(gid))
+				args = append(args, "-x", strconv.Itoa(gid))
 			}
 		case "sl":
 			// Service level

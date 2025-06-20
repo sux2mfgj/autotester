@@ -168,8 +168,8 @@ The runner maps configuration parameters to ib_send_bw command line flags:
 | `qp` | `-q` | `-q 4` |
 | `connection` | `-c` | `-c RC` |
 | `inline` | `-I` | `-I 64` |
-| `ib_dev` | `--ib-dev` | `--ib-dev mlx5_0` |
-| `gid_index` | `--gid-index` | `--gid-index 3` |
+| `ib_dev` | `-d` | `-d mlx5_0` |
+| `gid_index` | `-x` | `-x 3` |
 | `sl` | `-S` | `-S 0` |
 | `cpu_freq` | `-F` | `-F 2.40` |
 | `use_event` | `-e` | `-e` |
