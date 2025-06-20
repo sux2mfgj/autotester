@@ -85,15 +85,32 @@ func (c *TestConfig) GetServerHost(test *TestScenario) *HostConfig {
 // MergeRunnerConfig merges test-specific runner config with host-specific config
 func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *runner.Config) *runner.Config {
 	if hostConfig == nil && testConfig == nil {
-		return &runner.Config{}
+		return &runner.Config{
+			Args: make(map[string]interface{}),
+			Env:  make(map[string]string),
+		}
 	}
 	
 	if hostConfig == nil {
-		return testConfig
+		result := *testConfig // Copy
+		if result.Args == nil {
+			result.Args = make(map[string]interface{})
+		}
+		if result.Env == nil {
+			result.Env = make(map[string]string)
+		}
+		return &result
 	}
 	
 	if testConfig == nil {
-		return hostConfig
+		result := *hostConfig // Copy
+		if result.Args == nil {
+			result.Args = make(map[string]interface{})
+		}
+		if result.Env == nil {
+			result.Env = make(map[string]string)
+		}
+		return &result
 	}
 	
 	// Create a merged configuration
