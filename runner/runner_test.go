@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -313,8 +314,15 @@ func (r *TestRunner) BuildCommand(config Config) string {
 	return "test_command"
 }
 
-func (r *TestRunner) ParseMetrics(result *Result) {
+func (r *TestRunner) ParseMetrics(result *Result) error {
+	if result == nil {
+		return fmt.Errorf("result cannot be nil")
+	}
+	if result.Metrics == nil {
+		result.Metrics = make(map[string]interface{})
+	}
 	result.Metrics["test_metric"] = "test_value"
+	return nil
 }
 
 func TestRunner_Interface(t *testing.T) {
@@ -347,7 +355,9 @@ func TestRunner_Interface(t *testing.T) {
 	}
 
 	result := &Result{Metrics: make(map[string]interface{})}
-	runner.ParseMetrics(result)
+	if err := runner.ParseMetrics(result); err != nil {
+		t.Errorf("ParseMetrics should not return error: %v", err)
+	}
 	if val, exists := result.Metrics["test_metric"]; !exists || val != "test_value" {
 		t.Error("ParseMetrics should set test_metric")
 	}
@@ -386,5 +396,7 @@ func TestIbSendBwRunner_AutoRegistration(t *testing.T) {
 	_ = runner.SupportsRole("client")
 	_ = runner.BuildCommand(Config{Role: "server"})
 	result := &Result{Metrics: make(map[string]interface{})}
-	runner.ParseMetrics(result)
+	if err := runner.ParseMetrics(result); err != nil {
+		t.Errorf("ParseMetrics should not return error: %v", err)
+	}
 }

@@ -172,7 +172,10 @@ func (e *TestExecutor) runRemoteCommand(ctx context.Context, sshClient *ssh.Clie
 	}
 	
 	// Parse metrics from command output
-	r.ParseMetrics(runnerResult)
+	if err := r.ParseMetrics(runnerResult); err != nil {
+		e.coordinator.logger.Printf("  Warning: failed to parse metrics: %v", err)
+		// Continue execution - metrics parsing failure shouldn't fail the test
+	}
 	
 	return runnerResult, nil
 }

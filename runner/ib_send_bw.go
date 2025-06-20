@@ -185,7 +185,14 @@ func (r *IbSendBwRunner) BuildCommand(config Config) string {
 
 
 // ParseMetrics extracts performance metrics from ib_send_bw output
-func (r *IbSendBwRunner) ParseMetrics(result *Result) {
+func (r *IbSendBwRunner) ParseMetrics(result *Result) error {
+	if result == nil {
+		return fmt.Errorf("result cannot be nil")
+	}
+	
+	if result.Metrics == nil {
+		result.Metrics = make(map[string]interface{})
+	}
 	output := result.Output
 	lines := strings.Split(output, "\n")
 	
@@ -229,6 +236,7 @@ func (r *IbSendBwRunner) ParseMetrics(result *Result) {
 				if mtu, err := strconv.Atoi(matches[1]); err == nil {
 					result.Metrics["mtu"] = mtu
 				}
+				// Note: We intentionally ignore parsing errors and continue
 			}
 		}
 		
@@ -252,6 +260,8 @@ func (r *IbSendBwRunner) ParseMetrics(result *Result) {
 			}
 		}
 	}
+	
+	return nil
 }
 
 // parseResultLine parses a result line containing bandwidth measurements

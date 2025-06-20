@@ -49,7 +49,7 @@ type Runner interface {
 	BuildCommand(config Config) string
 	
 	// ParseMetrics extracts performance metrics from command output
-	ParseMetrics(result *Result)
+	ParseMetrics(result *Result) error
 }
 
 // Registry holds all registered runners

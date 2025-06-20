@@ -84,59 +84,62 @@ func TestIbSendBwRunner_ParseMetrics(t *testing.T) {
 				Metrics: make(map[string]interface{}),
 			}
 
-			runner.ParseMetrics(result)
+			err := runner.ParseMetrics(result)
+		if err != nil {
+			t.Errorf("ParseMetrics should not return error for test %q: %v", tt.name, err)
+		}
 
-			// Check all expected metrics are present and correct
-			for key, expectedValue := range tt.expectedMetrics {
-				actualValue, exists := result.Metrics[key]
-				if !exists {
-					t.Errorf("Expected metric %s not found in parsed results", key)
-					continue
-				}
-
-				// Handle different numeric types
-				switch expectedValue := expectedValue.(type) {
-				case float64:
-					if actualFloat, ok := actualValue.(float64); ok {
-						if actualFloat != expectedValue {
-							t.Errorf("Metric %s: expected %v, got %v", key, expectedValue, actualFloat)
-						}
-					} else {
-						t.Errorf("Metric %s: expected float64, got %T", key, actualValue)
-					}
-				case int64:
-					if actualInt, ok := actualValue.(int64); ok {
-						if actualInt != expectedValue {
-							t.Errorf("Metric %s: expected %v, got %v", key, expectedValue, actualInt)
-						}
-					} else {
-						t.Errorf("Metric %s: expected int64, got %T", key, actualValue)
-					}
-				case int:
-					if actualInt, ok := actualValue.(int); ok {
-						if actualInt != expectedValue {
-							t.Errorf("Metric %s: expected %v, got %v", key, expectedValue, actualInt)
-						}
-					} else {
-						t.Errorf("Metric %s: expected int, got %T", key, actualValue)
-					}
-				case string:
-					if actualString, ok := actualValue.(string); ok {
-						if actualString != expectedValue {
-							t.Errorf("Metric %s: expected %s, got %s", key, expectedValue, actualString)
-						}
-					} else {
-						t.Errorf("Metric %s: expected string, got %T", key, actualValue)
-					}
-				}
+		// Check all expected metrics are present and correct
+		for key, expectedValue := range tt.expectedMetrics {
+			actualValue, exists := result.Metrics[key]
+			if !exists {
+				t.Errorf("Expected metric %s not found in parsed results", key)
+				continue
 			}
 
-			// Check no unexpected metrics
-			for key := range result.Metrics {
-				if _, expected := tt.expectedMetrics[key]; !expected {
-					t.Errorf("Unexpected metric found: %s = %v", key, result.Metrics[key])
+			// Handle different numeric types
+		switch expectedValue := expectedValue.(type) {
+		case float64:
+			if actualFloat, ok := actualValue.(float64); ok {
+				if actualFloat != expectedValue {
+					t.Errorf("Metric %s: expected %v, got %v", key, expectedValue, actualFloat)
 				}
+			} else {
+				t.Errorf("Metric %s: expected float64, got %T", key, actualValue)
 			}
+		case int64:
+			if actualInt, ok := actualValue.(int64); ok {
+				if actualInt != expectedValue {
+					t.Errorf("Metric %s: expected %v, got %v", key, expectedValue, actualInt)
+				}
+			} else {
+				t.Errorf("Metric %s: expected int64, got %T", key, actualValue)
+			}
+		case int:
+			if actualInt, ok := actualValue.(int); ok {
+				if actualInt != expectedValue {
+					t.Errorf("Metric %s: expected %v, got %v", key, expectedValue, actualInt)
+				}
+			} else {
+				t.Errorf("Metric %s: expected int, got %T", key, actualValue)
+			}
+		case string:
+			if actualString, ok := actualValue.(string); ok {
+				if actualString != expectedValue {
+					t.Errorf("Metric %s: expected %s, got %s", key, expectedValue, actualString)
+				}
+			} else {
+				t.Errorf("Metric %s: expected string, got %T", key, actualValue)
+			}
+		}
+	}
+
+	// Check no unexpected metrics
+	for key := range result.Metrics {
+		if _, expected := tt.expectedMetrics[key]; !expected {
+			t.Errorf("Unexpected metric found: %s = %v", key, result.Metrics[key])
+		}
+	}
 		})
 	}
 }
@@ -429,4 +432,60 @@ func containsSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestIbSendBwRunner_ParseMetrics_ErrorCases(t *testing.T) {
+	runner := NewIbSendBwRunner("")
+
+	tests := []struct {
+		name        string
+		result      *Result
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "nil result",
+			result:      nil,
+			expectError: true,
+			errorMsg:    "result cannot be nil",
+		},
+		{
+			name: "nil metrics map gets initialized",
+			result: &Result{
+				Output:  "test output",
+				Metrics: nil,
+			},
+			expectError: false,
+		},
+		{
+			name: "malformed output should not error",
+			result: &Result{
+				Output:  "completely invalid output with no recognizable patterns",
+				Metrics: make(map[string]interface{}),
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runner.ParseMetrics(tt.result)
+			
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if tt.errorMsg != "" && err.Error() != tt.errorMsg {
+					t.Errorf("Expected error message %q, got %q", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error but got: %v", err)
+				}
+				// Verify metrics map was initialized
+				if tt.result != nil && tt.result.Metrics == nil {
+					t.Error("Metrics map should be initialized")
+				}
+			}
+		})
+	}
 }
