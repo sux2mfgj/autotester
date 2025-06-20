@@ -124,15 +124,17 @@ func (a *App) setupSignalHandling(cancel context.CancelFunc) {
 	}()
 }
 
-// registerRunners registers available runner implementations
+// registerRunners registers available runner implementations using auto-discovery
 func (a *App) registerRunners(coord *coordinator.Coordinator, cfg *config.TestConfig) error {
-	switch cfg.Runner {
-	case "ib_send_bw":
-		ibSendBwRunner := runner.NewIbSendBwRunner("")
-		coord.RegisterRunner("ib_send_bw", ibSendBwRunner)
-	default:
-		return fmt.Errorf("unsupported runner: %s", cfg.Runner)
+	// Create runner instance from registry
+	runnerInstance, err := runner.Create(cfg.Runner)
+	if err != nil {
+		availableRunners := runner.GetRegistered()
+		return fmt.Errorf("unsupported runner '%s'. Available runners: %v", cfg.Runner, availableRunners)
 	}
+	
+	// Register with coordinator
+	coord.RegisterRunner(cfg.Runner, runnerInstance)
 	
 	return nil
 }

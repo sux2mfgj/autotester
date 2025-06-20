@@ -4,19 +4,23 @@ This guide walks you through adding support for new perftest suite tools to the 
 
 ## Overview
 
-The tester uses a plugin-like architecture where each test tool is implemented as a `Runner`. To add a new command, you need to:
+The tester uses a self-contained, modular architecture where each test tool is implemented as a `Runner` that auto-registers itself. To add a new command, you only need to:
 
-1. Implement the `Runner` interface
-2. Add command building logic
-3. Register the new runner
-4. Update configuration examples
-5. Document parameters in [RUNNER_PARAMETERS.md](RUNNER_PARAMETERS.md)
+1. Create the runner file (auto-registering)
+2. Update configuration examples  
+3. Document parameters in [RUNNER_PARAMETERS.md](RUNNER_PARAMETERS.md)
+
+**Key Benefits:**
+- **High Modularity**: Runners are completely self-contained
+- **Auto-Registration**: No need to modify CLI or coordinator code
+- **Single Responsibility**: Each runner handles its own command building
+- **Fewer File Changes**: Adding a runner touches minimal files
 
 ## Step-by-Step Guide
 
-### Step 1: Implement the Runner Interface
+### Step 1: Create Self-Contained Runner
 
-Create a new file in the `runner/` package for your tool. For example, let's add support for `ib_read_bw`:
+Create a new file in the `runner/` package for your tool. For example, let's add support for `ib_read_bw`. The runner must implement the `Runner` interface and auto-register itself:
 
 ```go
 // runner/ib_read_bw.go
@@ -31,6 +35,13 @@ import (
 	"strings"
 	"time"
 )
+
+// Auto-register the ib_read_bw runner
+func init() {
+	Register("ib_read_bw", func() Runner {
+		return NewIbReadBwRunner("")
+	})
+}
 
 // IbReadBwRunner implements the Runner interface for ib_read_bw
 type IbReadBwRunner struct {
@@ -115,6 +126,48 @@ func (r *IbReadBwRunner) Run(ctx context.Context, config Config) (*Result, error
 	}
 	
 	return result, nil
+}
+
+// BuildCommand constructs the full command line for remote execution
+func (r *IbReadBwRunner) BuildCommand(config Config) string {
+	cmd := r.executablePath
+	
+	// Client mode needs a host argument, server mode doesn't
+	if config.Role == "client" && config.Host != "" {
+		cmd += fmt.Sprintf(" %s", config.Host)
+	}
+	
+	// Port (if specified)
+	if config.Port > 0 {
+		cmd += fmt.Sprintf(" -p %d", config.Port)
+	}
+	
+	// Duration (if specified)
+	if config.Duration > 0 {
+		cmd += fmt.Sprintf(" -D %d", int(config.Duration.Seconds()))
+	}
+	
+	// Additional arguments from config
+	for key, value := range config.Args {
+		switch key {
+		case "size":
+			cmd += fmt.Sprintf(" -s %v", value)
+		case "iterations":
+			cmd += fmt.Sprintf(" -n %v", value)
+		case "tx_depth":
+			cmd += fmt.Sprintf(" -t %v", value)
+		case "rx_depth":
+			cmd += fmt.Sprintf(" -r %v", value)
+		case "connection":
+			cmd += fmt.Sprintf(" -c %v", value)
+		case "bidirectional":
+			if bidir, ok := value.(bool); ok && bidir {
+				cmd += " -b"
+			}
+		}
+	}
+	
+	return cmd
 }
 
 // buildArgs constructs the command line arguments for ib_read_bw
@@ -268,31 +321,9 @@ func (b *CommandBuilder) buildIbReadBwCommand(config *runner.Config) string {
 }
 ```
 
-### Step 3: Register the New Runner
+**That's it!** The runner is now automatically available. The `init()` function registers it when the package is imported, and the CLI will automatically discover it.
 
-Add registration logic in the CLI application:
-
-```go
-// cli/app.go
-
-// Update the registerRunners method
-func (a *App) registerRunners(coord *coordinator.Coordinator, cfg *config.TestConfig) error {
-	switch cfg.Runner {
-	case "ib_send_bw":
-		ibSendBwRunner := runner.NewIbSendBwRunner("")
-		coord.RegisterRunner("ib_send_bw", ibSendBwRunner)
-	case "ib_read_bw":  // Add this case
-		ibReadBwRunner := runner.NewIbReadBwRunner("")
-		coord.RegisterRunner("ib_read_bw", ibReadBwRunner)
-	default:
-		return fmt.Errorf("unsupported runner: %s", cfg.Runner)
-	}
-	
-	return nil
-}
-```
-
-### Step 4: Create Configuration Examples
+### Step 2: Create Configuration Examples
 
 Add example configurations for the new tool:
 
@@ -345,7 +376,7 @@ tests:
         connection: "RC"
 ```
 
-### Step 5: Document Parameters
+### Step 3: Document Parameters
 
 Add the new tool's parameters to [RUNNER_PARAMETERS.md](RUNNER_PARAMETERS.md):
 
@@ -370,7 +401,7 @@ The `ib_read_bw` runner executes InfiniBand read bandwidth tests using the perft
 [Include configuration examples here]
 ```
 
-### Step 6: Update Main Documentation
+### That's All!
 
 Update the supported tools table in README.md:
 

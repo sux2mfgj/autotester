@@ -1,7 +1,6 @@
 package coordinator
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -9,18 +8,19 @@ import (
 	"tester/runner"
 )
 
-func TestCommandBuilder_BuildIbSendBwCommand(t *testing.T) {
-	builder := NewCommandBuilder()
+func TestIbSendBwRunner_BuildCommand(t *testing.T) {
+	// Create actual ib_send_bw runner instance
+	ibRunner := runner.NewIbSendBwRunner("")
 
 	tests := []struct {
 		name     string
-		config   *runner.Config
+		config   runner.Config
 		expected map[string]string // expected flags and their values
 		notExpected []string       // flags that should not be present
 	}{
 		{
 			name: "basic server config",
-			config: &runner.Config{
+			config: runner.Config{
 				Role: "server",
 				Port: 18515,
 				Args: map[string]interface{}{
@@ -37,7 +37,7 @@ func TestCommandBuilder_BuildIbSendBwCommand(t *testing.T) {
 		},
 		{
 			name: "basic client config",
-			config: &runner.Config{
+			config: runner.Config{
 				Role:       "client",
 				Host:       "192.168.1.100",
 				TargetHost: "10.0.0.100",
@@ -56,7 +56,7 @@ func TestCommandBuilder_BuildIbSendBwCommand(t *testing.T) {
 		},
 		{
 			name: "client with fallback to host",
-			config: &runner.Config{
+			config: runner.Config{
 				Role: "client",
 				Host: "192.168.1.100",
 				Port: 18515,
@@ -68,7 +68,7 @@ func TestCommandBuilder_BuildIbSendBwCommand(t *testing.T) {
 		},
 		{
 			name: "comprehensive config with all parameters",
-			config: &runner.Config{
+			config: runner.Config{
 				Role:     "client",
 				Host:     "192.168.1.100",
 				Port:     18515,
@@ -120,7 +120,7 @@ func TestCommandBuilder_BuildIbSendBwCommand(t *testing.T) {
 		},
 		{
 			name: "boolean flags disabled",
-			config: &runner.Config{
+			config: runner.Config{
 				Role: "server",
 				Args: map[string]interface{}{
 					"use_event":        false,
@@ -135,7 +135,7 @@ func TestCommandBuilder_BuildIbSendBwCommand(t *testing.T) {
 		},
 		{
 			name: "missing ib_dev parameter test",
-			config: &runner.Config{
+			config: runner.Config{
 				Role: "server",
 				Args: map[string]interface{}{
 					"size":      65536,
@@ -153,10 +153,7 @@ func TestCommandBuilder_BuildIbSendBwCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock runner for ib_send_bw
-			mockRunner := &MockRunner{name: "ib_send_bw"}
-			
-			cmd := builder.BuildCommand(mockRunner, tt.config)
+			cmd := ibRunner.BuildCommand(tt.config)
 			
 			// Check that all expected flags are present
 			for flag, expectedValue := range tt.expected {
@@ -187,13 +184,12 @@ func TestCommandBuilder_BuildIbSendBwCommand(t *testing.T) {
 	}
 }
 
-// TestCommandBuilder_ParameterCoverage ensures all documented parameters are handled
-func TestCommandBuilder_ParameterCoverage(t *testing.T) {
+// TestIbSendBwRunner_ParameterCoverage ensures all documented parameters are handled
+func TestIbSendBwRunner_ParameterCoverage(t *testing.T) {
 	// This test ensures that all parameters documented in RUNNER_PARAMETERS.md
-	// are actually implemented in the command builder
+	// are actually implemented in the runner
 	
-	builder := NewCommandBuilder()
-	mockRunner := &MockRunner{name: "ib_send_bw"}
+	ibRunner := runner.NewIbSendBwRunner("")
 	
 	// Define all parameters that should be supported
 	allParameters := map[string]interface{}{
@@ -217,14 +213,14 @@ func TestCommandBuilder_ParameterCoverage(t *testing.T) {
 		"report_gbits":     true,
 	}
 	
-	config := &runner.Config{
+	config := runner.Config{
 		Role: "client",
 		Host: "192.168.1.100",
 		Port: 18515,
 		Args: allParameters,
 	}
 	
-	cmd := builder.BuildCommand(mockRunner, config)
+	cmd := ibRunner.BuildCommand(config)
 	
 	// Define expected flag mappings
 	expectedFlags := map[string]string{
@@ -258,36 +254,52 @@ func TestCommandBuilder_ParameterCoverage(t *testing.T) {
 	t.Logf("Generated command: %s", cmd)
 }
 
-// TestCommandBuilder_UnsupportedRunner tests behavior with unknown runners
-func TestCommandBuilder_UnsupportedRunner(t *testing.T) {
-	builder := NewCommandBuilder()
-	mockRunner := &MockRunner{name: "unknown_runner"}
+// TestRunner_Registry tests the runner registration system
+func TestRunner_Registry(t *testing.T) {
+	// Test that ib_send_bw is automatically registered
+	availableRunners := runner.GetRegistered()
 	
-	config := &runner.Config{
-		Role: "client",
-		Host: "192.168.1.100",
+	found := false
+	for _, name := range availableRunners {
+		if name == "ib_send_bw" {
+			found = true
+			break
+		}
 	}
 	
-	cmd := builder.BuildCommand(mockRunner, config)
+	if !found {
+		t.Errorf("ib_send_bw runner should be auto-registered, available runners: %v", availableRunners)
+	}
 	
-	if cmd != "" {
-		t.Errorf("Expected empty command for unsupported runner, got: %s", cmd)
+	// Test creating runner from registry
+	runnerInstance, err := runner.Create("ib_send_bw")
+	if err != nil {
+		t.Fatalf("Failed to create ib_send_bw runner: %v", err)
+	}
+	
+	if runnerInstance.Name() != "ib_send_bw" {
+		t.Errorf("Expected runner name 'ib_send_bw', got: %s", runnerInstance.Name())
+	}
+	
+	// Test unknown runner
+	_, err = runner.Create("unknown_runner")
+	if err == nil {
+		t.Error("Expected error for unknown runner")
 	}
 }
 
-// TestCommandBuilder_EdgeCases tests edge cases and error conditions
-func TestCommandBuilder_EdgeCases(t *testing.T) {
-	builder := NewCommandBuilder()
-	mockRunner := &MockRunner{name: "ib_send_bw"}
+// TestIbSendBwRunner_EdgeCases tests edge cases and error conditions
+func TestIbSendBwRunner_EdgeCases(t *testing.T) {
+	ibRunner := runner.NewIbSendBwRunner("")
 	
 	tests := []struct {
 		name   string
-		config *runner.Config
+		config runner.Config
 		check  func(t *testing.T, cmd string)
 	}{
 		{
 			name: "zero port",
-			config: &runner.Config{
+			config: runner.Config{
 				Role: "server",
 				Port: 0,
 			},
@@ -299,7 +311,7 @@ func TestCommandBuilder_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "zero duration",
-			config: &runner.Config{
+			config: runner.Config{
 				Role:     "server",
 				Duration: 0,
 			},
@@ -311,7 +323,7 @@ func TestCommandBuilder_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "empty string values",
-			config: &runner.Config{
+			config: runner.Config{
 				Role: "server",
 				Args: map[string]interface{}{
 					"ib_dev":     "",
@@ -332,22 +344,21 @@ func TestCommandBuilder_EdgeCases(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := builder.BuildCommand(mockRunner, tt.config)
+			cmd := ibRunner.BuildCommand(tt.config)
 			tt.check(t, cmd)
 		})
 	}
 }
 
-// TestCommandBuilder_RegressionIbDevBug tests the specific bug we just fixed
-func TestCommandBuilder_RegressionIbDevBug(t *testing.T) {
+// TestIbSendBwRunner_RegressionIbDevBug tests the specific bug we just fixed
+func TestIbSendBwRunner_RegressionIbDevBug(t *testing.T) {
 	// This test specifically checks for the bug where ib_dev parameter
 	// was missing from the command builder, causing it to not appear in
 	// generated commands even though it was configured.
 	
-	builder := NewCommandBuilder()
-	mockRunner := &MockRunner{name: "ib_send_bw"}
+	ibRunner := runner.NewIbSendBwRunner("")
 	
-	config := &runner.Config{
+	config := runner.Config{
 		Role: "server",
 		Args: map[string]interface{}{
 			"ib_dev":    "mlx5_0",
@@ -355,7 +366,7 @@ func TestCommandBuilder_RegressionIbDevBug(t *testing.T) {
 		},
 	}
 	
-	cmd := builder.BuildCommand(mockRunner, config)
+	cmd := ibRunner.BuildCommand(config)
 	
 	// The bug was that ib_dev parameter was completely missing from command output
 	if !strings.Contains(cmd, "-d") {
@@ -387,23 +398,3 @@ func TestCommandBuilder_RegressionIbDevBug(t *testing.T) {
 	t.Logf("SUCCESS: ib_dev parameter correctly generates command: %s", cmd)
 }
 
-// MockRunner implements the Runner interface for testing
-type MockRunner struct {
-	name string
-}
-
-func (m *MockRunner) Name() string {
-	return m.name
-}
-
-func (m *MockRunner) Run(ctx context.Context, config runner.Config) (*runner.Result, error) {
-	return nil, nil
-}
-
-func (m *MockRunner) Validate(config runner.Config) error {
-	return nil
-}
-
-func (m *MockRunner) SupportsRole(role string) bool {
-	return true
-}

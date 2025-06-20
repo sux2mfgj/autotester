@@ -2,6 +2,8 @@ package runner
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 )
 
@@ -46,4 +48,49 @@ type Runner interface {
 	
 	// SupportsRole returns true if the runner supports the given role
 	SupportsRole(role string) bool
+	
+	// BuildCommand constructs the command line for remote execution
+	BuildCommand(config Config) string
+}
+
+// Registry holds all registered runners
+type Registry struct {
+	runners map[string]func() Runner
+	mu      sync.RWMutex
+}
+
+var globalRegistry = &Registry{
+	runners: make(map[string]func() Runner),
+}
+
+// Register adds a runner factory to the global registry
+func Register(name string, factory func() Runner) {
+	globalRegistry.mu.Lock()
+	defer globalRegistry.mu.Unlock()
+	globalRegistry.runners[name] = factory
+}
+
+// Create creates a new runner instance by name
+func Create(name string) (Runner, error) {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+	
+	factory, exists := globalRegistry.runners[name]
+	if !exists {
+		return nil, fmt.Errorf("runner %s not found", name)
+	}
+	
+	return factory(), nil
+}
+
+// GetRegistered returns all registered runner names
+func GetRegistered() []string {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+	
+	names := make([]string, 0, len(globalRegistry.runners))
+	for name := range globalRegistry.runners {
+		names = append(names, name)
+	}
+	return names
 }

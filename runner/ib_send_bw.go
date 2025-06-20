@@ -10,6 +10,13 @@ import (
 	"time"
 )
 
+// Auto-register the ib_send_bw runner
+func init() {
+	Register("ib_send_bw", func() Runner {
+		return NewIbSendBwRunner("")
+	})
+}
+
 // IbSendBwRunner implements the Runner interface for ib_send_bw
 type IbSendBwRunner struct {
 	executablePath string
@@ -96,6 +103,89 @@ func (r *IbSendBwRunner) Run(ctx context.Context, config Config) (*Result, error
 	}
 	
 	return result, nil
+}
+
+// BuildCommand constructs the full command line for remote execution
+func (r *IbSendBwRunner) BuildCommand(config Config) string {
+	cmd := r.executablePath
+	
+	// Server mode doesn't need a host argument, client does
+	if config.Role == "client" {
+		// Use TargetHost if specified, otherwise fall back to Host
+		targetHost := config.TargetHost
+		if targetHost == "" {
+			targetHost = config.Host
+		}
+		if targetHost != "" {
+			cmd += fmt.Sprintf(" %s", targetHost)
+		}
+	}
+	
+	// Port (if specified)
+	if config.Port > 0 {
+		cmd += fmt.Sprintf(" -p %d", config.Port)
+	}
+	
+	// Duration (if specified) - ib_send_bw uses -D flag
+	if config.Duration > 0 {
+		cmd += fmt.Sprintf(" -D %d", int(config.Duration.Seconds()))
+	}
+	
+	// Additional arguments from config
+	for key, value := range config.Args {
+		switch key {
+		case "size":
+			cmd += fmt.Sprintf(" -s %v", value)
+		case "iterations":
+			cmd += fmt.Sprintf(" -n %v", value)
+		case "tx_depth":
+			cmd += fmt.Sprintf(" -t %v", value)
+		case "rx_depth":
+			cmd += fmt.Sprintf(" -r %v", value)
+		case "mtu":
+			cmd += fmt.Sprintf(" -m %v", value)
+		case "qp":
+			cmd += fmt.Sprintf(" -q %v", value)
+		case "connection":
+			cmd += fmt.Sprintf(" -c %v", value)
+		case "inline":
+			cmd += fmt.Sprintf(" -I %v", value)
+		case "ib_dev":
+			cmd += fmt.Sprintf(" -d %v", value)
+		case "gid_index":
+			cmd += fmt.Sprintf(" -x %v", value)
+		case "sl":
+			cmd += fmt.Sprintf(" -S %v", value)
+		case "cpu_freq":
+			cmd += fmt.Sprintf(" -F %v", value)
+		case "use_event":
+			if useEvent, ok := value.(bool); ok && useEvent {
+				cmd += " -e"
+			}
+		case "bidirectional":
+			if bidir, ok := value.(bool); ok && bidir {
+				cmd += " -b"
+			}
+		case "report_cycles":
+			if cycles, ok := value.(bool); ok && cycles {
+				cmd += " -C"
+			}
+		case "report_histogram":
+			if hist, ok := value.(bool); ok && hist {
+				cmd += " -H"
+			}
+		case "odp":
+			if odp, ok := value.(bool); ok && odp {
+				cmd += " -o"
+			}
+		case "report_gbits":
+			if gbits, ok := value.(bool); ok && gbits {
+				cmd += " -R"
+			}
+		}
+	}
+	
+	return cmd
 }
 
 // buildArgs constructs the command line arguments for ib_send_bw

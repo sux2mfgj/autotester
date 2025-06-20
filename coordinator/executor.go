@@ -98,10 +98,9 @@ func (e *TestExecutor) executeClientServerTest(
 	result *TestResult,
 	test *config.TestScenario,
 ) error {
-	// Build commands for display
-	builder := NewCommandBuilder()
-	result.ServerCommand = builder.BuildCommand(r, serverConfig)
-	result.ClientCommand = builder.BuildCommand(r, clientConfig)
+	// Build commands for display using runner's own method
+	result.ServerCommand = r.BuildCommand(*serverConfig)
+	result.ClientCommand = r.BuildCommand(*clientConfig)
 	
 	// Start server first
 	e.coordinator.logger.Printf("  Starting server on %s", test.Server)
@@ -149,9 +148,8 @@ func (e *TestExecutor) runRemoteCommand(ctx context.Context, sshClient *ssh.Clie
 		return nil, fmt.Errorf("configuration validation failed: %w", err)
 	}
 	
-	// Build command for remote execution
-	builder := NewCommandBuilder()
-	command := builder.BuildCommand(r, config)
+	// Build command for remote execution using runner's own method
+	command := r.BuildCommand(*config)
 	
 	// Display command before execution
 	e.coordinator.logger.Printf("  Executing command on %s: %s", config.Role, command)
