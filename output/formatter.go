@@ -44,6 +44,13 @@ func (f *Formatter) outputJSON(results []*coordinator.TestResult, totalDuration 
 			"end_time":      result.EndTime,
 		}
 		
+		if result.ClientCommand != "" {
+			enhancedResult["client_command"] = result.ClientCommand
+		}
+		if result.ServerCommand != "" {
+			enhancedResult["server_command"] = result.ServerCommand
+		}
+		
 		if result.Error != "" {
 			enhancedResult["error"] = result.Error
 		}
@@ -125,6 +132,11 @@ func (f *Formatter) outputText(results []*coordinator.TestResult, totalDuration 
 		if result.ClientResult != nil {
 			fmt.Printf("   Client: %s\n", f.getStatusString(result.ClientResult.Success))
 			
+			// Show client command
+			if result.ClientCommand != "" {
+				fmt.Printf("   Client Command: %s\n", result.ClientCommand)
+			}
+			
 			// Always show client output if available
 			if result.ClientResult.Output != "" {
 				fmt.Printf("   Client Output:\n")
@@ -157,6 +169,11 @@ func (f *Formatter) outputText(results []*coordinator.TestResult, totalDuration 
 		
 		if result.ServerResult != nil {
 			fmt.Printf("   Server: %s\n", f.getStatusString(result.ServerResult.Success))
+			
+			// Show server command
+			if result.ServerCommand != "" {
+				fmt.Printf("   Server Command: %s\n", result.ServerCommand)
+			}
 			
 			// Always show server output if available
 			if result.ServerResult.Output != "" {

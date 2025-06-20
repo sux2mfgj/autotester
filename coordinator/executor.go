@@ -98,6 +98,11 @@ func (e *TestExecutor) executeClientServerTest(
 	result *TestResult,
 	test *config.TestScenario,
 ) error {
+	// Build commands for display
+	builder := NewCommandBuilder()
+	result.ServerCommand = builder.BuildCommand(r, serverConfig)
+	result.ClientCommand = builder.BuildCommand(r, clientConfig)
+	
 	// Start server first
 	e.coordinator.logger.Printf("  Starting server on %s", test.Server)
 	serverDone := make(chan *runner.Result, 1)
@@ -147,6 +152,9 @@ func (e *TestExecutor) runRemoteCommand(ctx context.Context, sshClient *ssh.Clie
 	// Build command for remote execution
 	builder := NewCommandBuilder()
 	command := builder.BuildCommand(r, config)
+	
+	// Display command before execution
+	e.coordinator.logger.Printf("  Executing command on %s: %s", config.Role, command)
 	
 	// Execute command via SSH
 	sshResult, err := sshClient.ExecuteCommand(ctx, command)
