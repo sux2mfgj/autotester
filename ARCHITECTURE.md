@@ -108,7 +108,6 @@ type TestScenario struct {
   - `coordinator.go`: Main coordinator with SSH connection management
   - `executor.go`: Individual test execution logic
   - `types.go`: Result type definitions
-  - `command_builder.go`: Command line construction
 
 #### Key Types:
 ```go
@@ -140,10 +139,11 @@ type TestResult struct {
 #### Key Interface:
 ```go
 type Runner interface {
-    Run(ctx context.Context, config Config) (*Result, error)
     Validate(config Config) error
     Name() string
     SupportsRole(role string) bool
+    BuildCommand(config Config) string
+    ParseMetrics(result *Result) error
 }
 ```
 
@@ -223,13 +223,13 @@ coordinator.TestResults → output.Formatter → stdout (JSON/Text)
 - **Implementations**: `IbSendBwRunner`
 - **Purpose**: Support different perftest tools
 
-### 2. **Builder Pattern**
-- **Implementation**: `CommandBuilder`
-- **Purpose**: Construct command lines for different runners
+### 2. **Registry Pattern**
+- **Implementation**: Auto-registration system in `runner` package
+- **Purpose**: Automatically discover and register runner implementations
 
 ### 3. **Factory Pattern**
-- **Usage**: Runner registration in CLI
-- **Purpose**: Create appropriate runner instances
+- **Usage**: Runner creation from registry
+- **Purpose**: Create appropriate runner instances by name
 
 ### 4. **Template Method Pattern**
 - **Implementation**: Test execution flow in executor
@@ -239,8 +239,8 @@ coordinator.TestResults → output.Formatter → stdout (JSON/Text)
 
 ### Adding New Perftest Runners
 1. Implement `runner.Runner` interface
-2. Add command building logic to `CommandBuilder`
-3. Register in `cli/app.go`
+2. Add auto-registration in `init()` function
+3. The runner will be automatically discovered
 
 ### Adding New Output Formats
 1. Extend `output.Formatter`
