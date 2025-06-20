@@ -192,15 +192,16 @@ For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```go
 type Runner interface {
-    Run(ctx context.Context, config Config) (*Result, error)
     Validate(config Config) error
     Name() string
     SupportsRole(role string) bool
+    BuildCommand(config Config) string
+    ParseMetrics(result *Result) error
 }
 ```
 
-2. Add command building logic to `CommandBuilder`
-3. Register the runner in `cli/app.go`
+2. Add auto-registration in your runner's `init()` function
+3. The runner will be automatically discovered by the CLI
 4. Document parameters in [docs/RUNNER_PARAMETERS.md](docs/RUNNER_PARAMETERS.md)
 
 For detailed guidance, see [docs/ADDING_NEW_COMMANDS.md](docs/ADDING_NEW_COMMANDS.md).
@@ -274,7 +275,7 @@ go test ./...
 go test -cover ./...
 
 # Run specific command builder tests
-go test -v ./coordinator
+go test -v ./runner
 ```
 
 ### Code Structure
