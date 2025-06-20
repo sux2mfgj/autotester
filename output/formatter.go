@@ -124,20 +124,59 @@ func (f *Formatter) outputText(results []*coordinator.TestResult, totalDuration 
 		
 		if result.ClientResult != nil {
 			fmt.Printf("   Client: %s\n", f.getStatusString(result.ClientResult.Success))
+			
+			// Always show client output if available
+			if result.ClientResult.Output != "" {
+				fmt.Printf("   Client Output:\n")
+				lines := strings.Split(result.ClientResult.Output, "\n")
+				for _, line := range lines {
+					if strings.TrimSpace(line) != "" {
+						fmt.Printf("     %s\n", line)
+					}
+				}
+			}
+			
+			// Show metrics for successful runs
 			if result.ClientResult.Success && len(result.ClientResult.Metrics) > 0 {
 				fmt.Printf("   Client Metrics:\n")
 				for k, v := range result.ClientResult.Metrics {
 					fmt.Printf("     %s: %v\n", k, v)
 				}
-			} else if !result.ClientResult.Success {
-				f.outputCommandDetails("Client", result.ClientResult)
+			}
+			
+			// Show detailed error info for failed runs
+			if !result.ClientResult.Success {
+				if result.ClientResult.Error != "" {
+					fmt.Printf("   Client Error: %s\n", result.ClientResult.Error)
+				}
+				if result.ClientResult.ExitCode != 0 {
+					fmt.Printf("   Client Exit Code: %d\n", result.ClientResult.ExitCode)
+				}
 			}
 		}
 		
 		if result.ServerResult != nil {
 			fmt.Printf("   Server: %s\n", f.getStatusString(result.ServerResult.Success))
+			
+			// Always show server output if available
+			if result.ServerResult.Output != "" {
+				fmt.Printf("   Server Output:\n")
+				lines := strings.Split(result.ServerResult.Output, "\n")
+				for _, line := range lines {
+					if strings.TrimSpace(line) != "" {
+						fmt.Printf("     %s\n", line)
+					}
+				}
+			}
+			
+			// Show detailed error info for failed runs
 			if !result.ServerResult.Success {
-				f.outputCommandDetails("Server", result.ServerResult)
+				if result.ServerResult.Error != "" {
+					fmt.Printf("   Server Error: %s\n", result.ServerResult.Error)
+				}
+				if result.ServerResult.ExitCode != 0 {
+					fmt.Printf("   Server Exit Code: %d\n", result.ServerResult.ExitCode)
+				}
 			}
 		}
 		
