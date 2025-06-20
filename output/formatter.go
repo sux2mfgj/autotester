@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"tester/coordinator"
+	"tester/runner"
 )
 
 // Formatter handles result output formatting
@@ -31,12 +33,70 @@ func (f *Formatter) OutputResults(results []*coordinator.TestResult, totalDurati
 
 // outputJSON outputs results in JSON format
 func (f *Formatter) outputJSON(results []*coordinator.TestResult, totalDuration time.Duration) error {
+	// Enhance results with detailed failure information for JSON output
+	enhancedResults := make([]map[string]interface{}, len(results))
+	for i, result := range results {
+		enhancedResult := map[string]interface{}{
+			"scenario_name": result.ScenarioName,
+			"success":       result.Success,
+			"duration":      result.Duration,
+			"start_time":    result.StartTime,
+			"end_time":      result.EndTime,
+		}
+		
+		if result.Error != "" {
+			enhancedResult["error"] = result.Error
+		}
+		
+		if result.ClientResult != nil {
+			clientInfo := map[string]interface{}{
+				"success":   result.ClientResult.Success,
+				"duration":  result.ClientResult.Duration,
+				"exit_code": result.ClientResult.ExitCode,
+			}
+			
+			if result.ClientResult.Output != "" {
+				clientInfo["output"] = result.ClientResult.Output
+			}
+			if result.ClientResult.Error != "" {
+				clientInfo["error"] = result.ClientResult.Error
+			}
+			if len(result.ClientResult.Metrics) > 0 {
+				clientInfo["metrics"] = result.ClientResult.Metrics
+			}
+			
+			enhancedResult["client_result"] = clientInfo
+		}
+		
+		if result.ServerResult != nil {
+			serverInfo := map[string]interface{}{
+				"success":   result.ServerResult.Success,
+				"duration":  result.ServerResult.Duration,
+				"exit_code": result.ServerResult.ExitCode,
+			}
+			
+			if result.ServerResult.Output != "" {
+				serverInfo["output"] = result.ServerResult.Output
+			}
+			if result.ServerResult.Error != "" {
+				serverInfo["error"] = result.ServerResult.Error
+			}
+			if len(result.ServerResult.Metrics) > 0 {
+				serverInfo["metrics"] = result.ServerResult.Metrics
+			}
+			
+			enhancedResult["server_result"] = serverInfo
+		}
+		
+		enhancedResults[i] = enhancedResult
+	}
+	
 	output := map[string]interface{}{
 		"total_duration": totalDuration,
 		"total_tests":    len(results),
 		"passed":         f.countPassed(results),
 		"failed":         f.countFailed(results),
-		"results":        results,
+		"results":        enhancedResults,
 	}
 	
 	encoder := json.NewEncoder(os.Stdout)
@@ -69,11 +129,16 @@ func (f *Formatter) outputText(results []*coordinator.TestResult, totalDuration 
 				for k, v := range result.ClientResult.Metrics {
 					fmt.Printf("     %s: %v\n", k, v)
 				}
+			} else if !result.ClientResult.Success {
+				f.outputCommandDetails("Client", result.ClientResult)
 			}
 		}
 		
 		if result.ServerResult != nil {
 			fmt.Printf("   Server: %s\n", f.getStatusString(result.ServerResult.Success))
+			if !result.ServerResult.Success {
+				f.outputCommandDetails("Server", result.ServerResult)
+			}
 		}
 		
 		fmt.Println()
@@ -110,4 +175,25 @@ func (f *Formatter) countFailed(results []*coordinator.TestResult) int {
 		}
 	}
 	return count
+}
+
+// outputCommandDetails outputs detailed failure information for a command
+func (f *Formatter) outputCommandDetails(role string, result *runner.Result) {
+	if result.Error != "" {
+		fmt.Printf("     %s Error: %s\n", role, result.Error)
+	}
+	
+	if result.ExitCode != 0 {
+		fmt.Printf("     %s Exit Code: %d\n", role, result.ExitCode)
+	}
+	
+	if result.Output != "" {
+		fmt.Printf("     %s Output:\n", role)
+		lines := strings.Split(result.Output, "\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				fmt.Printf("       %s\n", line)
+			}
+		}
+	}
 }

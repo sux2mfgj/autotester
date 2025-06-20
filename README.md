@@ -186,16 +186,29 @@ Total Tests: 3
 Passed: 2
 Failed: 1
 
-1. TCP Bandwidth Test - Default
+1. IB Send BW Test - Basic
    Status: ✓ PASS
    Duration: 12.3s
    Client: ✓ PASS
    Client Metrics:
      bandwidth_bps: 1.048576e+09
-     bandwidth_readable: 1.00 Gbits/sec
-     transfer_bytes: 1.073741824e+09
-     transfer_readable: 1.00 GBytes
+     bandwidth_readable: 1000.00 MB/sec
+     message_rate_pps: 15625000
    Server: ✓ PASS
+
+2. IB Send BW Test - Failed
+   Status: ✗ FAIL
+   Duration: 2.1s
+   Client: ✗ FAIL
+     Client Error: SSH command execution failed: Process exited with status 1
+     Client Exit Code: 1
+     Client Output:
+       ib_send_bw: command not found
+   Server: ✗ FAIL
+     Server Error: SSH command execution failed: Process exited with status 127
+     Server Exit Code: 127
+     Server Output:
+       bash: ib_send_bw: command not found
 ```
 
 ### JSON Output
@@ -207,15 +220,42 @@ Failed: 1
   "failed": 1,
   "results": [
     {
-      "scenario_name": "TCP Bandwidth Test",
+      "scenario_name": "IB Send BW Test - Basic",
       "success": true,
       "duration": "12.345s",
       "client_result": {
         "success": true,
+        "exit_code": 0,
+        "duration": "12.1s",
         "metrics": {
           "bandwidth_bps": 1048576000,
-          "bandwidth_readable": "1.00 Gbits/sec"
+          "bandwidth_readable": "1000.00 MB/sec",
+          "message_rate_pps": 15625000
         }
+      },
+      "server_result": {
+        "success": true,
+        "exit_code": 0,
+        "duration": "12.3s"
+      }
+    },
+    {
+      "scenario_name": "IB Send BW Test - Failed",
+      "success": false,
+      "duration": "2.1s",
+      "client_result": {
+        "success": false,
+        "exit_code": 127,
+        "duration": "2.0s",
+        "error": "SSH command execution failed: Process exited with status 127",
+        "output": "ib_send_bw: command not found"
+      },
+      "server_result": {
+        "success": false,
+        "exit_code": 127,
+        "duration": "2.1s",
+        "error": "SSH command execution failed: Process exited with status 127",
+        "output": "bash: ib_send_bw: command not found"
       }
     }
   ]
