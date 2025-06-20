@@ -267,7 +267,14 @@ go build -o tester
 
 ### Testing
 ```bash
+# Run all tests
 go test ./...
+
+# Run with coverage
+go test -cover ./...
+
+# Run specific command builder tests
+go test -v ./coordinator
 ```
 
 ### Code Structure
