@@ -136,6 +136,7 @@ tests:
 | Tool | Description | Use Case |
 |------|-------------|----------|
 | `ib_send_bw` | InfiniBand send bandwidth test | High-performance InfiniBand send testing |
+| `iperf3` | TCP/UDP network bandwidth test | General network performance testing |
 
 For detailed runner parameter documentation, see [docs/RUNNER_PARAMETERS.md](docs/RUNNER_PARAMETERS.md).
 

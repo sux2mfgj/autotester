@@ -239,3 +239,236 @@ ibping <ip>  # Client
 # Check IB port status
 ibstatus
 ```
+
+## iperf3 Runner
+
+The `iperf3` runner executes TCP/UDP network bandwidth tests using the industry-standard iperf3 tool.
+
+### Network Configuration
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `target_host` | string | Specific IP address for client to connect to (overrides SSH host) |
+| `port` | int | Port number for the test (default: 5201) |
+
+**Separate SSH and Test Networks:**
+
+Similar to InfiniBand testing, you can use different networks for SSH management and actual testing:
+
+```yaml
+hosts:
+  tcp_server:
+    ssh:
+      host: "192.168.1.100"    # Management network for SSH
+    runner:
+      port: 5201
+      
+  tcp_client:
+    ssh:
+      host: "192.168.1.101"    # Management network for SSH  
+    runner:
+      port: 5201
+      target_host: "10.0.0.100"  # Test network IP for iperf3
+```
+
+### iperf3 Arguments
+
+Supported iperf3 arguments through `config.args`:
+
+| Argument | Type | Description |
+|----------|------|-------------|
+| `parallel_streams` | int | Number of parallel streams (-P flag) |
+| `window_size` | string | TCP window size (e.g., "2M", "128K") |
+| `reverse` | bool | Measure server-to-client bandwidth |
+| `bitrate` | string | Target bitrate limit (e.g., "1G", "100M") |
+| `interval` | int | Measurement interval in seconds |
+| `protocol` | string | Protocol type ("tcp" or "udp") |
+| `ipv6` | bool | Force IPv6 usage |
+| `ipv4` | bool | Force IPv4 usage |
+| `bind_address` | string | Bind to specific local address |
+| `omit_seconds` | int | Omit initial seconds (TCP slow start) |
+| `buffer_length` | string | Buffer size (e.g., "128K", "1M") |
+| `verbose` | bool | Enable verbose output |
+
+### Configuration Examples
+
+#### Basic TCP Test
+
+```yaml
+hosts:
+  tcp_server:
+    ssh:
+      host: "192.168.1.100"
+    role: "server"
+    runner:
+      port: 5201
+
+  tcp_client:
+    ssh:
+      host: "192.168.1.101"
+    role: "client"
+    runner:
+      port: 5201
+      args:
+        parallel_streams: 1
+        window_size: "128K"
+```
+
+#### High-Performance Multi-Stream Test
+
+```yaml
+tests:
+  - name: "High Performance TCP"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 60s
+      args:
+        parallel_streams: 8       # 8 parallel TCP streams
+        window_size: "4M"        # Large TCP window
+        buffer_length: "1M"      # Large buffer
+        omit_seconds: 5          # Skip TCP slow start
+        interval: 10             # Report every 10 seconds
+```
+
+#### UDP Bandwidth Test
+
+```yaml
+tests:
+  - name: "UDP Bandwidth Test"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      args:
+        protocol: "udp"
+        bitrate: "1G"           # UDP requires bitrate limit
+        parallel_streams: 1
+```
+
+### Protocol Differences
+
+#### TCP vs UDP
+- **TCP**: Reliable, connection-oriented, no bitrate limit needed
+- **UDP**: Unreliable, connectionless, requires bitrate specification
+
+#### Direction Testing
+- **Upload (default)**: Client sends to server
+- **Download**: Use `reverse: true` for server-to-client testing
+
+### Command Line Mapping
+
+The runner maps configuration parameters to iperf3 command line flags:
+
+| Config Parameter | Command Flag | Example |
+|------------------|--------------|---------|
+| `parallel_streams` | `-P` | `-P 4` |
+| `window_size` | `-w` | `-w 2M` |
+| `reverse` | `-R` | `-R` |
+| `bitrate` | `-b` | `-b 1G` |
+| `interval` | `-i` | `-i 5` |
+| `protocol: "udp"` | `-u` | `-u` |
+| `ipv6` | `-6` | `-6` |
+| `ipv4` | `-4` | `-4` |
+| `bind_address` | `-B` | `-B 10.0.0.1` |
+| `omit_seconds` | `-O` | `-O 5` |
+| `buffer_length` | `-l` | `-l 128K` |
+| `verbose` | `-V` | `-V` |
+
+### Output Metrics
+
+The runner extracts the following metrics from iperf3 output:
+
+| Metric | Description |
+|--------|-------------|
+| `bandwidth_bps` | Bandwidth in bits per second |
+| `bandwidth_mbps` | Bandwidth in megabits per second |
+| `bandwidth_gbps` | Bandwidth in gigabits per second |
+| `retransmits` | TCP retransmission count |
+| `parallel_streams` | Number of parallel streams used |
+| `actual_duration` | Actual test duration |
+
+### Performance Tuning
+
+#### For High-Speed Networks (10G+)
+```yaml
+args:
+  parallel_streams: 8
+  window_size: "8M"
+  buffer_length: "1M"
+  omit_seconds: 10
+```
+
+#### For WAN Testing
+```yaml
+args:
+  parallel_streams: 1
+  window_size: "2M"
+  omit_seconds: 5
+  interval: 5
+```
+
+#### For UDP Testing
+```yaml
+args:
+  protocol: "udp"
+  bitrate: "1G"          # Start conservative
+  parallel_streams: 1
+```
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **Connection refused**: Ensure iperf3 server is running and port is open
+   ```bash
+   # Test server connectivity
+   telnet <server_ip> 5201
+   ```
+
+2. **Firewall blocking**: Check firewall rules for iperf3 port
+   ```bash
+   # Allow iperf3 port (example for ufw)
+   sudo ufw allow 5201
+   ```
+
+3. **Low performance**: Try multiple streams and larger windows
+   ```yaml
+   args:
+     parallel_streams: 4
+     window_size: "2M"
+   ```
+
+4. **UDP packet loss**: Reduce bitrate for UDP tests
+   ```yaml
+   args:
+     protocol: "udp"
+     bitrate: "100M"  # Reduce from 1G
+   ```
+
+#### Debug Commands
+
+```bash
+# Test basic connectivity
+iperf3 -c <server_ip> -t 10
+
+# Test with multiple streams
+iperf3 -c <server_ip> -P 4 -t 30
+
+# Test UDP with specific bitrate
+iperf3 -c <server_ip> -u -b 100M -t 10
+
+# Test reverse direction
+iperf3 -c <server_ip> -R -t 10
+```
+
+### Comparison with InfiniBand Tools
+
+| Aspect | iperf3 | InfiniBand perftest |
+|--------|--------|-------------------|
+| **Protocol** | TCP/UDP | RDMA/IB verbs |
+| **Network** | Any IP network | InfiniBand fabric |
+| **Complexity** | Simple | Hardware-specific |
+| **Output** | JSON/Text | Text only |
+| **Use Case** | General networking | HPC/Storage |
+| **Performance** | Up to network limit | RDMA performance |
