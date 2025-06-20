@@ -134,7 +134,46 @@ tests:
 |------|-------------|----------|
 | `ib_send_bw` | InfiniBand send bandwidth test | High-performance InfiniBand send testing |
 
-### ib_send_bw Arguments
+### ib_send_bw Configuration
+
+#### Network Configuration
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `target_host` | string | Specific IP address for client to connect to (overrides SSH host) |
+| `port` | int | Port number for the test |
+
+**Separate SSH and InfiniBand Networks:**
+
+In many HPC environments, SSH management traffic and InfiniBand traffic use different networks. You can configure different IPs:
+
+```yaml
+hosts:
+  ib_server:
+    ssh:
+      host: "192.168.1.100"    # Management network for SSH
+    runner:
+      # Server doesn't need target_host (listens on all interfaces)
+      
+  ib_client:
+    ssh:
+      host: "192.168.1.101"    # Management network for SSH  
+    runner:
+      target_host: "10.0.0.100"  # InfiniBand network IP for testing
+```
+
+You can also override `target_host` per test:
+
+```yaml
+tests:
+  - name: "Test with specific IB IP"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      target_host: "10.0.0.200"  # Override for this test
+```
+
+#### ib_send_bw Arguments
 
 Supported ib_send_bw arguments through `config.args`:
 

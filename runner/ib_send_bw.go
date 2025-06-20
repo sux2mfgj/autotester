@@ -41,9 +41,11 @@ func (r *IbSendBwRunner) Validate(config Config) error {
 		return fmt.Errorf("unsupported role: %s", config.Role)
 	}
 	
-	// For ib_send_bw, client needs host but server doesn't
-	if config.Role == "client" && config.Host == "" {
-		return fmt.Errorf("host is required for client role")
+	// For ib_send_bw, client needs a target host but server doesn't
+	if config.Role == "client" {
+		if config.TargetHost == "" && config.Host == "" {
+			return fmt.Errorf("target_host or host is required for client role")
+		}
 	}
 	
 	return nil
@@ -102,7 +104,12 @@ func (r *IbSendBwRunner) buildArgs(config Config) []string {
 	
 	// Server mode doesn't need a host argument, client does
 	if config.Role == "client" {
-		args = append(args, config.Host)
+		// Use TargetHost if specified, otherwise fall back to Host
+		targetHost := config.TargetHost
+		if targetHost == "" {
+			targetHost = config.Host
+		}
+		args = append(args, targetHost)
 	}
 	
 	// Port (if specified)

@@ -63,7 +63,13 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	
 	clientConfig := e.coordinator.config.MergeRunnerConfig(clientHost.Runner, test.Config)
 	clientConfig.Role = "client"
-	clientConfig.Host = serverHost.SSH.Host // Client connects to server
+	clientConfig.Host = serverHost.SSH.Host // Client connects to server (SSH host)
+	
+	// If no specific target host is configured, use the server's SSH host
+	// This allows for separate SSH host and InfiniBand target IPs
+	if clientConfig.TargetHost == "" {
+		clientConfig.TargetHost = serverHost.SSH.Host
+	}
 	
 	// Create context with timeout
 	testCtx, cancel := context.WithTimeout(ctx, e.coordinator.config.Timeout)

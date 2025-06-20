@@ -6,7 +6,7 @@ timeout: 5m
 hosts:
   ib_server:
     ssh:
-      host: "192.168.1.100"
+      host: "192.168.1.100"  # SSH/management network
       port: 22
       user: "testuser"
       key_path: "~/.ssh/id_rsa"
@@ -21,7 +21,7 @@ hosts:
 
   ib_client:
     ssh:
-      host: "192.168.1.101"
+      host: "192.168.1.101"  # SSH/management network  
       port: 22
       user: "testuser"
       key_path: "~/.ssh/id_rsa"
@@ -30,6 +30,7 @@ hosts:
     role: "client"
     runner:
       port: 18515
+      # target_host: "10.0.0.100"  # Optional: InfiniBand network IP (uncomment if different from SSH host)
       args:
         size: 65536
         iterations: 1000

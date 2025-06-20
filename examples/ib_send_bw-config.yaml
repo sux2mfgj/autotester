@@ -6,7 +6,7 @@ timeout: 10m
 hosts:
   ib_server:
     ssh:
-      host: "192.168.1.100"
+      host: "192.168.1.100"  # SSH connection host
       port: 22
       user: "testuser"
       key_path: "~/.ssh/id_rsa"
@@ -23,7 +23,7 @@ hosts:
 
   ib_client:
     ssh:
-      host: "192.168.1.101"
+      host: "192.168.1.101"  # SSH connection host
       port: 22
       user: "testuser"
       key_path: "~/.ssh/id_rsa"
@@ -32,6 +32,7 @@ hosts:
     role: "client"
     runner:
       port: 18515
+      target_host: "10.0.0.100"  # InfiniBand network IP (different from SSH host)
       args:
         size: 65536
         iterations: 1000
@@ -112,6 +113,18 @@ tests:
         size: 4096
         iterations: 5000
         mtu: 4096        # 4KB MTU
+        connection: "RC"
+        
+  - name: "IB Send BW - Custom Target IP"
+    description: "Test with specific InfiniBand target IP override"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 30s
+      target_host: "10.0.0.200"  # Override target IP for this specific test
+      args:
+        size: 8192
+        iterations: 2000
         connection: "RC"
         
   - name: "IB Send BW - Event Completion"

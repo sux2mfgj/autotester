@@ -16,8 +16,9 @@ type Config struct {
 	Role     string                   `yaml:"role"` // "client" or "server"
 	
 	// Network settings
-	Host     string                   `yaml:"host"`
-	Port     int                      `yaml:"port"`
+	Host       string                 `yaml:"host"`        // SSH host or general host identifier
+	TargetHost string                 `yaml:"target_host"` // Specific target IP for client connections
+	Port       int                    `yaml:"port"`
 }
 
 // Result represents the result of a test execution

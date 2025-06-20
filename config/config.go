@@ -98,12 +98,13 @@ func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *ru
 	
 	// Create a merged configuration
 	merged := &runner.Config{
-		Duration: hostConfig.Duration,
-		Args:     make(map[string]interface{}),
-		Env:      make(map[string]string),
-		Role:     hostConfig.Role,
-		Host:     hostConfig.Host,
-		Port:     hostConfig.Port,
+		Duration:   hostConfig.Duration,
+		Args:       make(map[string]interface{}),
+		Env:        make(map[string]string),
+		Role:       hostConfig.Role,
+		Host:       hostConfig.Host,
+		TargetHost: hostConfig.TargetHost,
+		Port:       hostConfig.Port,
 	}
 	
 	// Copy host config
@@ -120,6 +121,9 @@ func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *ru
 	}
 	if testConfig.Host != "" {
 		merged.Host = testConfig.Host
+	}
+	if testConfig.TargetHost != "" {
+		merged.TargetHost = testConfig.TargetHost
 	}
 	if testConfig.Port > 0 {
 		merged.Port = testConfig.Port

@@ -31,7 +31,12 @@ func (b *CommandBuilder) buildIbSendBwCommand(config *runner.Config) string {
 	
 	// Server mode doesn't need a host argument, client does
 	if config.Role == "client" {
-		cmd += fmt.Sprintf(" %s", config.Host)
+		// Use TargetHost if specified, otherwise fall back to Host
+		targetHost := config.TargetHost
+		if targetHost == "" {
+			targetHost = config.Host
+		}
+		cmd += fmt.Sprintf(" %s", targetHost)
 	}
 	
 	// Port (if specified)
