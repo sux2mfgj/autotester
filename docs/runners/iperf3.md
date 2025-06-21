@@ -470,7 +470,7 @@ tests:
 
 ```bash
 # Run comprehensive network tests
-./tester -config network-suite.yaml -json > results.json
+./perf-runner -config network-suite.yaml -json > results.json
 
 # Parse results for analysis
 jq '.tests[] | {name: .name, bandwidth: .metrics.bandwidth_gbps}' results.json

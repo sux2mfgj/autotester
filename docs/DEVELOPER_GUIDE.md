@@ -1,6 +1,6 @@
 # Developer Guide - InfiniBand Performance Testing Tool
 
-This guide provides comprehensive information for developers working on the tester tool, including architecture, extending functionality, and contributing to the project.
+This guide provides comprehensive information for developers working on the perf-runner tool, including architecture, extending functionality, and contributing to the project.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ This guide provides comprehensive information for developers working on the test
 
 ## Architecture Overview
 
-The tester follows a modular architecture with clear separation of concerns:
+The perf-runner follows a modular architecture with clear separation of concerns:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -83,7 +83,7 @@ The tester follows a modular architecture with clear separation of concerns:
 git clone <repository-url>
 cd tester
 go mod tidy
-go build -o tester
+go build -o perf-runner
 ```
 
 ### Testing

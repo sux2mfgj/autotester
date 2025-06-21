@@ -1,4 +1,4 @@
-module tester
+module perf-runner
 
 go 1.21
 

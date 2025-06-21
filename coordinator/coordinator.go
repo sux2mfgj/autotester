@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"tester/config"
-	"tester/runner"
-	"tester/ssh"
+	"perf-runner/config"
+	"perf-runner/runner"
+	"perf-runner/ssh"
 )
 
 // Coordinator manages test execution across multiple hosts

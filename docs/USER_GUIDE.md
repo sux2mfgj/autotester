@@ -1,6 +1,6 @@
 # User Guide - InfiniBand Performance Testing Tool
 
-This guide provides comprehensive information for users running performance tests with the tester tool.
+This guide provides comprehensive information for users running performance tests with the perf-runner tool.
 
 ## Table of Contents
 
@@ -27,7 +27,7 @@ This guide provides comprehensive information for users running performance test
 git clone <repository-url>
 cd tester
 go mod tidy
-go build -o tester
+go build -o perf-runner
 ```
 
 ### Basic Usage
@@ -37,16 +37,16 @@ go build -o tester
 
 ```bash
 # Use example configuration
-./tester -config examples/ib_send_bw-config.yaml
+./perf-runner -config examples/ib_send_bw-config.yaml
 
 # Use custom configuration
-./tester -config mytest.yaml
+./perf-runner -config mytest.yaml
 
 # JSON output
-./tester -json
+./perf-runner -json
 
 # Verbose logging
-./tester -verbose
+./perf-runner -verbose
 ```
 
 ## Supported Tools

@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"tester/cli"
+	"perf-runner/cli"
 )
 
 func main() {

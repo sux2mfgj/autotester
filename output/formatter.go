@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"tester/coordinator"
-	"tester/runner"
+	"perf-runner/coordinator"
+	"perf-runner/runner"
 )
 
 // Formatter handles result output formatting

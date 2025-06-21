@@ -7,14 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Building and Running
 ```bash
 # Build the project
-go build -o tester
+go build -o perf-runner
 
 # Run with configuration
-./tester -config examples/ib_send_bw-config.yaml
-./tester -config examples/iperf3-config.yaml
+./perf-runner -config examples/ib_send_bw-config.yaml
+./perf-runner -config examples/iperf3-config.yaml
 
 # JSON output with verbose logging
-./tester -json -verbose -config mytest.yaml
+./perf-runner -json -verbose -config mytest.yaml
 ```
 
 ### Testing
@@ -137,7 +137,7 @@ The runner will be automatically discovered and available for use.
 - Example configurations: `examples/`
 - Documentation: `docs/` (USER_GUIDE.md, DEVELOPER_GUIDE.md, etc.)
 - Test files: `*_test.go` files throughout packages
-- Binary output: `tester` (after build)
+- Binary output: `perf-runner` (after build)
 
 ## Dependencies
 

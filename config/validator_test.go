@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"tester/ssh"
+	"perf-runner/ssh"
 )
 
 func TestValidator_ValidateConfig(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"tester/runner"
-	"tester/ssh"
+	"perf-runner/runner"
+	"perf-runner/ssh"
 
 	"gopkg.in/yaml.v3"
 )

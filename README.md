@@ -37,17 +37,17 @@ A Go-based tool for executing InfiniBand performance tests using perftest suite 
 git clone <repository-url>
 cd tester
 go mod tidy
-go build -o tester
+go build -o perf-runner
 ```
 
 ### Basic Usage
 ```bash
 # Use example configurations
-./tester -config examples/ib_send_bw-config.yaml    # InfiniBand testing
-./tester -config examples/iperf3-config.yaml       # TCP/UDP testing
+./perf-runner -config examples/ib_send_bw-config.yaml    # InfiniBand testing
+./perf-runner -config examples/iperf3-config.yaml       # TCP/UDP testing
 
 # JSON output and verbose logging
-./tester -json -verbose -config mytest.yaml
+./perf-runner -json -verbose -config mytest.yaml
 ```
 
 > **For detailed configuration examples and troubleshooting, see the [User Guide](docs/USER_GUIDE.md)**

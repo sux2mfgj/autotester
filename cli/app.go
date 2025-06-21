@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"tester/config"
-	"tester/coordinator"
-	"tester/output"
-	"tester/runner"
+	"perf-runner/config"
+	"perf-runner/coordinator"
+	"perf-runner/output"
+	"perf-runner/runner"
 )
 
 const appVersion = "1.0.0"
@@ -28,7 +28,7 @@ func NewApp() *App {
 	flags := NewFlags()
 	
 	// Setup logging
-	logger := log.New(os.Stderr, "[tester] ", log.LstdFlags)
+	logger := log.New(os.Stderr, "[perf-runner] ", log.LstdFlags)
 	if !*flags.Verbose {
 		logger.SetOutput(os.Stderr)
 	}
@@ -42,7 +42,7 @@ func NewApp() *App {
 // Run executes the main application logic
 func (a *App) Run() error {
 	if *a.flags.Version {
-		fmt.Printf("tester version %s\n", appVersion)
+		fmt.Printf("perf-runner version %s\n", appVersion)
 		return nil
 	}
 	

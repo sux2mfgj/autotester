@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"tester/config"
-	"tester/runner"
-	"tester/ssh"
+	"perf-runner/config"
+	"perf-runner/runner"
+	"perf-runner/ssh"
 )
 
 // TestExecutor handles execution of individual test scenarios

@@ -3,7 +3,7 @@ package coordinator
 import (
 	"time"
 
-	"tester/runner"
+	"perf-runner/runner"
 )
 
 // TestResult represents the result of a complete test scenario

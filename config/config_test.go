@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"tester/runner"
-	"tester/ssh"
+	"perf-runner/runner"
+	"perf-runner/ssh"
 )
 
 func TestLoadConfig(t *testing.T) {
