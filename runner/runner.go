@@ -50,6 +50,9 @@ type Runner interface {
 	
 	// ParseMetrics extracts performance metrics from command output
 	ParseMetrics(result *Result) error
+	
+	// SetExecutablePath sets the custom executable path for this runner
+	SetExecutablePath(path string)
 }
 
 // Registry holds all registered runners
@@ -71,6 +74,11 @@ func Register(name string, factory func() Runner) {
 
 // Create creates a new runner instance by name
 func Create(name string) (Runner, error) {
+	return CreateWithPath(name, "")
+}
+
+// CreateWithPath creates a new runner instance by name with a custom binary path
+func CreateWithPath(name string, binaryPath string) (Runner, error) {
 	globalRegistry.mu.RLock()
 	defer globalRegistry.mu.RUnlock()
 	
@@ -79,7 +87,15 @@ func Create(name string) (Runner, error) {
 		return nil, fmt.Errorf("runner %s not found", name)
 	}
 	
-	return factory(), nil
+	// Create the runner with default path first
+	runner := factory()
+	
+	// If a custom binary path is specified, update it
+	if binaryPath != "" {
+		runner.SetExecutablePath(binaryPath)
+	}
+	
+	return runner, nil
 }
 
 // GetRegistered returns all registered runner names

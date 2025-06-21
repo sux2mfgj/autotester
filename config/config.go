@@ -18,6 +18,9 @@ type TestConfig struct {
 	Runner      string              `yaml:"runner"`
 	Timeout     time.Duration       `yaml:"timeout"`
 	
+	// Binary path configurations
+	BinaryPaths map[string]string   `yaml:"binary_paths,omitempty"`
+	
 	// Host configurations
 	Hosts       map[string]*HostConfig `yaml:"hosts"`
 	
@@ -157,6 +160,14 @@ func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *ru
 	}
 	
 	return merged
+}
+
+// GetBinaryPath returns the binary path for a specific runner, or empty string if not configured
+func (c *TestConfig) GetBinaryPath(runnerName string) string {
+	if c.BinaryPaths == nil {
+		return ""
+	}
+	return c.BinaryPaths[runnerName]
 }
 
 // SaveConfig saves configuration to a YAML file

@@ -95,14 +95,23 @@ This is a Go-based InfiniBand/network performance testing tool that orchestrates
 
 ## Configuration Structure
 
-Tests are defined in YAML with three main sections:
+Tests are defined in YAML with these main sections:
 
 - **Hosts**: SSH connection details and roles
 - **Tests**: Client-server test scenarios
+- **Binary Paths**: Custom paths for test tools (optional)
 - **Runner-specific**: Tool parameters (duration, args, etc.)
 
-Example host configuration:
+Example configuration with custom binary paths:
 ```yaml
+name: "Custom Binary Test"
+runner: "ib_send_bw"
+
+# Optional: specify custom paths for test binaries
+binary_paths:
+  ib_send_bw: "/opt/perftest/bin/ib_send_bw"
+  iperf3: "/usr/local/bin/iperf3"
+
 hosts:
   server_host:
     ssh:

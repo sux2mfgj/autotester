@@ -1,6 +1,10 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
 
 // Validator handles configuration validation
 type Validator struct{}
@@ -44,6 +48,11 @@ func (v *Validator) ValidateConfig(c *TestConfig) error {
 		if err := v.validateTestScenario(c, i, &test); err != nil {
 			return err
 		}
+	}
+	
+	// Validate binary paths
+	if err := v.validateBinaryPaths(c); err != nil {
+		return err
 	}
 	
 	return nil
@@ -108,6 +117,56 @@ func (v *Validator) validateTestScenario(c *TestConfig, index int, test *TestSce
 	
 	if test.Repeat < 0 {
 		return fmt.Errorf("test %s: repeat count cannot be negative", test.Name)
+	}
+	
+	return nil
+}
+
+// validateBinaryPaths validates binary path configurations
+func (v *Validator) validateBinaryPaths(c *TestConfig) error {
+	if c.BinaryPaths == nil {
+		return nil // Binary paths are optional
+	}
+	
+	for runnerName, binaryPath := range c.BinaryPaths {
+		if binaryPath == "" {
+			return fmt.Errorf("binary_paths.%s: path cannot be empty", runnerName)
+		}
+		
+		// Check if the path is absolute or check if it exists in PATH
+		if filepath.IsAbs(binaryPath) {
+			// For absolute paths, check if the file exists and is executable
+			if err := v.validateAbsoluteBinaryPath(runnerName, binaryPath); err != nil {
+				return err
+			}
+		} else {
+			// For relative paths, we'll trust that they exist in PATH
+			// (checking PATH during config validation might be too strict)
+		}
+	}
+	
+	return nil
+}
+
+// validateAbsoluteBinaryPath validates an absolute binary path
+func (v *Validator) validateAbsoluteBinaryPath(runnerName, binaryPath string) error {
+	// Check if file exists
+	info, err := os.Stat(binaryPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("binary_paths.%s: file does not exist: %s", runnerName, binaryPath)
+		}
+		return fmt.Errorf("binary_paths.%s: cannot access file %s: %v", runnerName, binaryPath, err)
+	}
+	
+	// Check if it's a regular file
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("binary_paths.%s: %s is not a regular file", runnerName, binaryPath)
+	}
+	
+	// Check if it's executable (on Unix-like systems)
+	if info.Mode().Perm()&0111 == 0 {
+		return fmt.Errorf("binary_paths.%s: %s is not executable", runnerName, binaryPath)
 	}
 	
 	return nil

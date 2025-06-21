@@ -33,6 +33,11 @@ func (r *Iperf3Runner) Name() string {
 	return "iperf3"
 }
 
+// SetExecutablePath sets the custom executable path for this runner
+func (r *Iperf3Runner) SetExecutablePath(path string) {
+	r.executablePath = path
+}
+
 // SupportsRole returns true if the runner supports the given role
 func (r *Iperf3Runner) SupportsRole(role string) bool {
 	return role == "client" || role == "server"

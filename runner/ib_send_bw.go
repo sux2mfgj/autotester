@@ -34,6 +34,11 @@ func (r *IbSendBwRunner) Name() string {
 	return "ib_send_bw"
 }
 
+// SetExecutablePath sets the custom executable path for this runner
+func (r *IbSendBwRunner) SetExecutablePath(path string) {
+	r.executablePath = path
+}
+
 // SupportsRole returns true if the runner supports the given role
 func (r *IbSendBwRunner) SupportsRole(role string) bool {
 	return role == "client" || role == "server"

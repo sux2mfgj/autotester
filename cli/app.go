@@ -126,11 +126,18 @@ func (a *App) setupSignalHandling(cancel context.CancelFunc) {
 
 // registerRunners registers available runner implementations using auto-discovery
 func (a *App) registerRunners(coord *coordinator.Coordinator, cfg *config.TestConfig) error {
-	// Create runner instance from registry
-	runnerInstance, err := runner.Create(cfg.Runner)
+	// Get custom binary path if configured
+	binaryPath := cfg.GetBinaryPath(cfg.Runner)
+	
+	// Create runner instance from registry with custom path
+	runnerInstance, err := runner.CreateWithPath(cfg.Runner, binaryPath)
 	if err != nil {
 		availableRunners := runner.GetRegistered()
 		return fmt.Errorf("unsupported runner '%s'. Available runners: %v", cfg.Runner, availableRunners)
+	}
+	
+	if binaryPath != "" {
+		a.logger.Printf("Using custom binary path for %s: %s", cfg.Runner, binaryPath)
 	}
 	
 	// Register with coordinator

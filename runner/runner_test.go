@@ -325,6 +325,10 @@ func (r *TestRunner) ParseMetrics(result *Result) error {
 	return nil
 }
 
+func (r *TestRunner) SetExecutablePath(path string) {
+	// TestRunner doesn't need to do anything with the path
+}
+
 func TestRunner_Interface(t *testing.T) {
 	// Test that TestRunner implements Runner interface
 	var runner Runner = &TestRunner{name: "test"}

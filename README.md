@@ -12,6 +12,7 @@ A Go-based tool for executing InfiniBand performance tests using perftest suite 
 - 🔒 **Security**: SSH key-based authentication
 - ⚡ **Concurrent Execution**: Parallel host connections and coordinated test execution
 - 🎯 **Test Scenarios**: Support for multiple test scenarios with repetition
+- 🛠️ **Custom Binary Paths**: Specify custom paths for test tools via configuration
 
 ## Documentation
 
