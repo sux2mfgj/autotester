@@ -13,7 +13,7 @@ We currently have a function to manage and execute performance measurements betw
 - Backward compatible with existing 2-node configurations
 - [x] create a sample configuration that use a dpdk testpmd as intermediate node
 
-**COMPLETED**: Created example-dpdk-testpmd.yaml with DPDK testpmd configuration for packet forwarding including:
+**COMPLETED**: Created examples/example-dpdk-testpmd.yaml with DPDK testpmd configuration for packet forwarding including:
 - DPDK-specific parameters (cores, memory channels, huge pages, ports)
 - Multiple test scenarios (single/multi-stream, TCP/UDP)
 - High-performance configuration options
