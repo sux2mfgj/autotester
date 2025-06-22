@@ -1,0 +1,81 @@
+name: "InfiniBand Performance Test with Intermediate Node"
+description: "Testing IB bandwidth through intermediate forwarding node"
+runner: "ib_send_bw"
+timeout: 15m
+
+# Custom paths for InfiniBand tools
+binary_paths:
+  ib_send_bw: "/opt/mellanox/perftest/bin/ib_send_bw"
+
+hosts:
+  # InfiniBand server
+  ib_server:
+    ssh:
+      host: "ib-node1.hpc.local"
+      user: "hpcuser"
+      key_path: "~/.ssh/cluster_key"
+    role: "server"
+    runner:
+      port: 18515
+
+  # Intermediate forwarding node
+  ib_forwarder:
+    ssh:
+      host: "ib-gateway.hpc.local"
+      user: "hpcuser"
+      key_path: "~/.ssh/cluster_key"
+    role: "intermediate"
+    runner:
+      port: 18515
+      target_host: "192.168.100.10"  # IB server's IB network IP
+
+  # InfiniBand client
+  ib_client:
+    ssh:
+      host: "ib-node2.hpc.local"
+      user: "hpcuser"
+      key_path: "~/.ssh/cluster_key"
+    role: "client"
+    runner:
+      target_host: "192.168.100.20"  # IB forwarder's IB network IP
+
+tests:
+  - name: "Large Message Bandwidth via Forwarder"
+    description: "64KB messages through intermediate node"
+    client: "ib_client"
+    server: "ib_server"
+    intermediate: "ib_forwarder"
+    config:
+      duration: 60s
+      args:
+        size: 65536
+        iterations: 1000
+        connection: "RC"
+        ib_dev: "mlx5_0"
+        
+  - name: "Small Message Latency via Forwarder"
+    description: "8B messages for latency measurement"
+    client: "ib_client"
+    server: "ib_server"
+    intermediate: "ib_forwarder"
+    config:
+      duration: 30s
+      args:
+        size: 8
+        iterations: 10000
+        connection: "UC"
+        ib_dev: "mlx5_0"
+        
+  - name: "High Performance Test"
+    description: "4MB messages for maximum throughput"
+    client: "ib_client"
+    server: "ib_server"
+    intermediate: "ib_forwarder"
+    config:
+      duration: 120s
+      args:
+        size: 4194304
+        iterations: 500
+        connection: "RC"
+        ib_dev: "mlx5_0"
+        gid_index: 3

@@ -1,0 +1,86 @@
+name: "Three-Node Performance Test with Intermediate Node"
+description: "Testing Client → Intermediate → Server topology for packet forwarding"
+runner: "iperf3"
+timeout: 10m
+
+# Custom binary paths for different tools
+binary_paths:
+  iperf3: "/usr/bin/iperf3"
+  socat: "/usr/bin/socat"  # Used for intermediate forwarding
+
+hosts:
+  # Server node - receives final packets
+  tcp_server:
+    ssh:
+      host: "test-server.example.com"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    runner:
+      port: 5201
+
+  # Intermediate node - forwards packets between client and server
+  forwarder:
+    ssh:
+      host: "intermediate.example.com"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "intermediate"
+    runner:
+      port: 5201
+      target_host: "10.0.1.100"  # Server's test network IP
+
+  # Client node - generates traffic
+  tcp_client:
+    ssh:
+      host: "test-client.example.com"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+    runner:
+      target_host: "10.0.1.200"  # Intermediate's test network IP
+
+tests:
+  - name: "TCP Bandwidth via Intermediate"
+    description: "Measure bandwidth through packet forwarding"
+    client: "tcp_client"
+    server: "tcp_server"
+    intermediate: "forwarder"  # NEW: Specify intermediate node
+    config:
+      duration: 30s
+      args:
+        parallel_streams: 1
+        window_size: "1M"
+        
+  - name: "High Throughput Test"
+    description: "Multi-stream test through intermediate"
+    client: "tcp_client"
+    server: "tcp_server"
+    intermediate: "forwarder"
+    config:
+      duration: 60s
+      args:
+        parallel_streams: 4
+        window_size: "4M"
+        
+  - name: "UDP Test via Intermediate"
+    description: "UDP performance through forwarding"
+    client: "tcp_client"
+    server: "tcp_server"
+    intermediate: "forwarder"
+    config:
+      duration: 20s
+      args:
+        udp: true
+        bandwidth: "100M"
+        
+  # Standard 2-node test for comparison (no intermediate)
+  - name: "Direct Connection Baseline"
+    description: "Direct client-server test for comparison"
+    client: "tcp_client"
+    server: "tcp_server"
+    # No intermediate specified - uses direct connection
+    config:
+      duration: 30s
+      args:
+        parallel_streams: 1

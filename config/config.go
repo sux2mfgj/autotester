@@ -41,6 +41,7 @@ type TestScenario struct {
 	Description string            `yaml:"description,omitempty"`
 	Client      string            `yaml:"client"` // Host name for client
 	Server      string            `yaml:"server"` // Host name for server
+	Intermediate string           `yaml:"intermediate,omitempty"` // Host name for intermediate node (optional)
 	Config      *runner.Config    `yaml:"config"`
 	
 	// Test-specific settings
@@ -83,6 +84,19 @@ func (c *TestConfig) GetClientHost(test *TestScenario) *HostConfig {
 // GetServerHost returns the server host configuration for a test
 func (c *TestConfig) GetServerHost(test *TestScenario) *HostConfig {
 	return c.Hosts[test.Server]
+}
+
+// GetIntermediateHost returns the intermediate host configuration for a test
+func (c *TestConfig) GetIntermediateHost(test *TestScenario) *HostConfig {
+	if test.Intermediate == "" {
+		return nil
+	}
+	return c.Hosts[test.Intermediate]
+}
+
+// HasIntermediateNode returns true if the test scenario includes an intermediate node
+func (c *TestConfig) HasIntermediateNode(test *TestScenario) bool {
+	return test.Intermediate != ""
 }
 
 // MergeRunnerConfig merges test-specific runner config with host-specific config

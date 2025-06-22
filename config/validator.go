@@ -80,8 +80,8 @@ func (v *Validator) validateHost(name string, host *HostConfig) error {
 		return fmt.Errorf("host %s: either SSH key path or password is required", name)
 	}
 	
-	if host.Role != "" && host.Role != "client" && host.Role != "server" {
-		return fmt.Errorf("host %s: invalid role %s, must be 'client' or 'server'", name, host.Role)
+	if host.Role != "" && host.Role != "client" && host.Role != "server" && host.Role != "intermediate" {
+		return fmt.Errorf("host %s: invalid role %s, must be 'client', 'server', or 'intermediate'", name, host.Role)
 	}
 	
 	return nil
@@ -108,6 +108,21 @@ func (v *Validator) validateTestScenario(c *TestConfig, index int, test *TestSce
 	
 	if _, exists := c.Hosts[test.Server]; !exists {
 		return fmt.Errorf("test %s: server host %s not found in hosts configuration", test.Name, test.Server)
+	}
+	
+	// Check intermediate host if specified
+	if test.Intermediate != "" {
+		if _, exists := c.Hosts[test.Intermediate]; !exists {
+			return fmt.Errorf("test %s: intermediate host %s not found in hosts configuration", test.Name, test.Intermediate)
+		}
+		
+		// Validate that intermediate is different from client and server
+		if test.Intermediate == test.Client {
+			return fmt.Errorf("test %s: intermediate and client cannot be the same host", test.Name)
+		}
+		if test.Intermediate == test.Server {
+			return fmt.Errorf("test %s: intermediate and server cannot be the same host", test.Name)
+		}
 	}
 	
 	// Validate that client and server are different hosts

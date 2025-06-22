@@ -88,9 +88,8 @@ This is a Go-based InfiniBand/network performance testing tool that orchestrates
 1. CLI loads YAML configuration and validates it
 2. Coordinator establishes SSH connections to all hosts
 3. For each test scenario:
-   - Server runner starts in background
-   - Client runner connects and executes test
-   - Results are collected and parsed for metrics
+   - **2-node topology**: Server starts → Client connects → Results collected
+   - **3-node topology**: Server starts → Intermediate starts → Client connects → Results collected
 4. Results formatted as JSON or human-readable text
 
 ## Configuration Structure
@@ -102,15 +101,15 @@ Tests are defined in YAML with these main sections:
 - **Binary Paths**: Custom paths for test tools (optional)
 - **Runner-specific**: Tool parameters (duration, args, etc.)
 
-Example configuration with custom binary paths:
+Example configuration with intermediate node:
 ```yaml
-name: "Custom Binary Test"
-runner: "ib_send_bw"
+name: "Three-Node Test"
+runner: "iperf3"
 
 # Optional: specify custom paths for test binaries
 binary_paths:
-  ib_send_bw: "/opt/perftest/bin/ib_send_bw"
-  iperf3: "/usr/local/bin/iperf3"
+  iperf3: "/usr/bin/iperf3"
+  socat: "/usr/bin/socat"  # For intermediate forwarding
 
 hosts:
   server_host:
@@ -119,6 +118,35 @@ hosts:
       user: "testuser" 
       key_path: "~/.ssh/id_rsa"
     role: "server"
+    
+  forwarder_host:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "intermediate"
+    
+  client_host:
+    ssh:
+      host: "192.168.1.102"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+
+tests:
+  - name: "Test via Intermediate"
+    client: "client_host"
+    server: "server_host"
+    intermediate: "forwarder_host"  # NEW: 3-node topology
+    config:
+      duration: 30s
+      
+  - name: "Direct Test"
+    client: "client_host"
+    server: "server_host"
+    # No intermediate - 2-node topology
+    config:
+      duration: 30s
 ```
 
 ## Adding New Test Tools

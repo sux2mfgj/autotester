@@ -38,6 +38,7 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	// Get host configurations
 	clientHost := e.coordinator.config.GetClientHost(test)
 	serverHost := e.coordinator.config.GetServerHost(test)
+	intermediateHost := e.coordinator.config.GetIntermediateHost(test)
 	
 	if clientHost == nil {
 		return nil, fmt.Errorf("client host %s not found", test.Client)
@@ -49,6 +50,7 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	// Get SSH clients
 	clientSSH := e.coordinator.sshClients[test.Client]
 	serverSSH := e.coordinator.sshClients[test.Server]
+	var intermediateSSH *ssh.Client
 	
 	if clientSSH == nil {
 		return nil, fmt.Errorf("SSH client for host %s not connected", test.Client)
@@ -57,33 +59,73 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 		return nil, fmt.Errorf("SSH client for host %s not connected", test.Server)
 	}
 	
+	// Check intermediate node if specified
+	if e.coordinator.config.HasIntermediateNode(test) {
+		if intermediateHost == nil {
+			return nil, fmt.Errorf("intermediate host %s not found", test.Intermediate)
+		}
+		intermediateSSH = e.coordinator.sshClients[test.Intermediate]
+		if intermediateSSH == nil {
+			return nil, fmt.Errorf("SSH client for intermediate host %s not connected", test.Intermediate)
+		}
+	}
+	
 	// Prepare runner configurations
 	serverConfig := e.coordinator.config.MergeRunnerConfig(serverHost.Runner, test.Config)
 	serverConfig.Role = "server"
 	
 	clientConfig := e.coordinator.config.MergeRunnerConfig(clientHost.Runner, test.Config)
 	clientConfig.Role = "client"
-	clientConfig.Host = serverHost.SSH.Host // Client connects to server (SSH host)
 	
-	// If no specific target host is configured, use the server's SSH host
-	// This allows for separate SSH host and InfiniBand target IPs
-	if clientConfig.TargetHost == "" {
-		clientConfig.TargetHost = serverHost.SSH.Host
+	var intermediateConfig *runner.Config
+	
+	// Configure connection topology based on intermediate node presence
+	if e.coordinator.config.HasIntermediateNode(test) {
+		// 3-node topology: Client → Intermediate → Server
+		intermediateConfig = e.coordinator.config.MergeRunnerConfig(intermediateHost.Runner, test.Config)
+		intermediateConfig.Role = "intermediate"
+		
+		// Intermediate connects to server
+		intermediateConfig.Host = serverHost.SSH.Host
+		if intermediateConfig.TargetHost == "" {
+			intermediateConfig.TargetHost = serverHost.SSH.Host
+		}
+		
+		// Client connects to intermediate
+		clientConfig.Host = intermediateHost.SSH.Host
+		if clientConfig.TargetHost == "" {
+			clientConfig.TargetHost = intermediateHost.SSH.Host
+		}
+	} else {
+		// 2-node topology: Client → Server (original behavior)
+		clientConfig.Host = serverHost.SSH.Host
+		if clientConfig.TargetHost == "" {
+			clientConfig.TargetHost = serverHost.SSH.Host
+		}
 	}
 	
 	// Create context with timeout
 	testCtx, cancel := context.WithTimeout(ctx, e.coordinator.config.Timeout)
 	defer cancel()
 	
-	// Execute the test
-	if err := e.executeClientServerTest(testCtx, r, clientSSH, serverSSH, clientConfig, serverConfig, result, test); err != nil {
-		return nil, err
+	// Execute the test based on topology
+	if e.coordinator.config.HasIntermediateNode(test) {
+		// 3-node topology
+		if err := e.executeThreeNodeTest(testCtx, r, clientSSH, intermediateSSH, serverSSH, clientConfig, intermediateConfig, serverConfig, result, test); err != nil {
+			return nil, err
+		}
+	} else {
+		// 2-node topology (original)
+		if err := e.executeClientServerTest(testCtx, r, clientSSH, serverSSH, clientConfig, serverConfig, result, test); err != nil {
+			return nil, err
+		}
 	}
 	
 	result.EndTime = time.Now()
 	result.Duration = result.EndTime.Sub(result.StartTime)
 	result.Success = result.ClientResult != nil && result.ClientResult.Success && 
 		(result.ServerResult == nil || result.ServerResult.Success) &&
+		(result.IntermediateResult == nil || result.IntermediateResult.Success) &&
 		result.Error == ""
 	
 	return result, nil
@@ -136,6 +178,89 @@ func (e *TestExecutor) executeClientServerTest(
 		result.Error = fmt.Sprintf("server execution failed: %v", err)
 	case <-ctx.Done():
 		result.Error = "test timed out"
+	}
+	
+	return nil
+}
+
+// executeThreeNodeTest handles the coordination between client, intermediate, and server
+func (e *TestExecutor) executeThreeNodeTest(
+	ctx context.Context,
+	r runner.Runner,
+	clientSSH, intermediateSSH, serverSSH *ssh.Client,
+	clientConfig, intermediateConfig, serverConfig *runner.Config,
+	result *TestResult,
+	test *config.TestScenario,
+) error {
+	// Build commands for display
+	result.ServerCommand = r.BuildCommand(*serverConfig)
+	result.ClientCommand = r.BuildCommand(*clientConfig)
+	result.IntermediateCommand = r.BuildCommand(*intermediateConfig)
+	
+	// Start server first
+	e.coordinator.logger.Printf("  Starting server on %s", test.Server)
+	serverDone := make(chan *runner.Result, 1)
+	serverErr := make(chan error, 1)
+	
+	go func() {
+		serverResult, err := e.runRemoteCommand(ctx, serverSSH, r, serverConfig)
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		serverDone <- serverResult
+	}()
+	
+	// Wait for server to start
+	time.Sleep(2 * time.Second)
+	
+	// Start intermediate node
+	e.coordinator.logger.Printf("  Starting intermediate node on %s", test.Intermediate)
+	intermediateDone := make(chan *runner.Result, 1)
+	intermediateErr := make(chan error, 1)
+	
+	go func() {
+		intermediateResult, err := e.runRemoteCommand(ctx, intermediateSSH, r, intermediateConfig)
+		if err != nil {
+			intermediateErr <- err
+			return
+		}
+		intermediateDone <- intermediateResult
+	}()
+	
+	// Wait for intermediate to establish connection to server
+	time.Sleep(2 * time.Second)
+	
+	// Start client (connects to intermediate)
+	e.coordinator.logger.Printf("  Starting client on %s", test.Client)
+	clientResult, err := e.runRemoteCommand(ctx, clientSSH, r, clientConfig)
+	if err != nil {
+		return fmt.Errorf("client execution failed: %w", err)
+	}
+	
+	result.ClientResult = clientResult
+	
+	// Wait for intermediate and server to complete or timeout
+	select {
+	case serverResult := <-serverDone:
+		result.ServerResult = serverResult
+	case err := <-serverErr:
+		result.Error = fmt.Sprintf("server execution failed: %v", err)
+	case <-ctx.Done():
+		result.Error = "test timed out"
+	}
+	
+	// Collect intermediate result
+	select {
+	case intermediateResult := <-intermediateDone:
+		result.IntermediateResult = intermediateResult
+	case err := <-intermediateErr:
+		if result.Error == "" {
+			result.Error = fmt.Sprintf("intermediate execution failed: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		// Give intermediate a bit more time to clean up
+		e.coordinator.logger.Printf("  Warning: intermediate node did not complete within timeout")
 	}
 	
 	return nil

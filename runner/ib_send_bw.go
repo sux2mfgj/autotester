@@ -41,7 +41,7 @@ func (r *IbSendBwRunner) SetExecutablePath(path string) {
 
 // SupportsRole returns true if the runner supports the given role
 func (r *IbSendBwRunner) SupportsRole(role string) bool {
-	return role == "client" || role == "server"
+	return role == "client" || role == "server" || role == "intermediate"
 }
 
 // Validate checks if the configuration is valid for ib_send_bw
@@ -57,6 +57,13 @@ func (r *IbSendBwRunner) Validate(config Config) error {
 		}
 	}
 	
+	// For intermediate nodes, both source (client) and target (server) connections needed
+	if config.Role == "intermediate" {
+		if config.TargetHost == "" && config.Host == "" {
+			return fmt.Errorf("target_host or host is required for intermediate role")
+		}
+	}
+	
 	return nil
 }
 
@@ -65,7 +72,7 @@ func (r *IbSendBwRunner) Validate(config Config) error {
 func (r *IbSendBwRunner) BuildCommand(config Config) string {
 	cmd := r.executablePath
 	
-	// Server mode doesn't need a host argument, client does
+	// Handle different roles
 	if config.Role == "client" {
 		// Use TargetHost if specified, otherwise fall back to Host
 		targetHost := config.TargetHost
@@ -75,7 +82,21 @@ func (r *IbSendBwRunner) BuildCommand(config Config) string {
 		if targetHost != "" {
 			cmd += " " + targetHost
 		}
+	} else if config.Role == "intermediate" {
+		// Intermediate node runs in forwarding mode
+		// Add -F flag for forwarding mode (conceptual - would need custom tool)
+		cmd += " -F"
+		
+		// Target host for forwarding destination
+		targetHost := config.TargetHost
+		if targetHost == "" {
+			targetHost = config.Host
+		}
+		if targetHost != "" {
+			cmd += " --forward-to " + targetHost
+		}
 	}
+	// Server mode doesn't need a host argument
 	
 	// Port (if specified)
 	if config.Port > 0 {

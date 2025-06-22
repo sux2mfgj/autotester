@@ -40,7 +40,7 @@ func (r *Iperf3Runner) SetExecutablePath(path string) {
 
 // SupportsRole returns true if the runner supports the given role
 func (r *Iperf3Runner) SupportsRole(role string) bool {
-	return role == "client" || role == "server"
+	return role == "client" || role == "server" || role == "intermediate"
 }
 
 // Validate checks if the configuration is valid for iperf3
@@ -53,6 +53,13 @@ func (r *Iperf3Runner) Validate(config Config) error {
 	if config.Role == "client" {
 		if config.TargetHost == "" && config.Host == "" {
 			return fmt.Errorf("target_host or host is required for client role")
+		}
+	}
+	
+	// For intermediate nodes, target host is required for forwarding
+	if config.Role == "intermediate" {
+		if config.TargetHost == "" && config.Host == "" {
+			return fmt.Errorf("target_host or host is required for intermediate role")
 		}
 	}
 	
@@ -77,7 +84,7 @@ func (r *Iperf3Runner) Validate(config Config) error {
 func (r *Iperf3Runner) BuildCommand(config Config) string {
 	cmd := r.executablePath
 	
-	// Set role (server or client)
+	// Set role (server, client, or intermediate)
 	if config.Role == "server" {
 		cmd += " -s"
 	} else if config.Role == "client" {
@@ -87,6 +94,28 @@ func (r *Iperf3Runner) BuildCommand(config Config) string {
 			targetHost = config.Host
 		}
 		cmd += fmt.Sprintf(" -c %s", targetHost)
+	} else if config.Role == "intermediate" {
+		// Intermediate mode - run a proxy/relay
+		// For iperf3, this would typically be a custom proxy tool or socat
+		// We'll use a conceptual approach where the tool runs in relay mode
+		cmd = "socat" // Use socat as a TCP/UDP relay tool
+		
+		targetHost := config.TargetHost
+		if targetHost == "" {
+			targetHost = config.Host
+		}
+		
+		// Listen on the configured port and forward to target
+		listenPort := config.Port
+		if listenPort <= 0 {
+			listenPort = 5201 // Default iperf3 port
+		}
+		
+		targetPort := listenPort // Forward to same port on target
+		cmd += fmt.Sprintf(" TCP-LISTEN:%d,fork TCP:%s:%d", listenPort, targetHost, targetPort)
+		
+		// Return early for socat command
+		return cmd
 	}
 	
 	// Port (if specified)

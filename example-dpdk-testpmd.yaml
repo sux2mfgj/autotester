@@ -1,0 +1,110 @@
+name: "DPDK TestPMD Intermediate Node Performance Test"
+description: "Testing network performance through DPDK testpmd packet forwarding"
+runner: "iperf3"
+timeout: 15m
+
+# Custom binary paths for DPDK and network tools
+binary_paths:
+  iperf3: "/usr/bin/iperf3"
+  testpmd: "/usr/local/dpdk/bin/dpdk-testpmd"
+
+hosts:
+  # Network performance server
+  perf_server:
+    ssh:
+      host: "dpdk-server.testlab.com"
+      user: "dpdk"
+      key_path: "~/.ssh/dpdk_key"
+    role: "server"
+    runner:
+      port: 5201
+
+  # DPDK testpmd intermediate node for packet forwarding
+  dpdk_forwarder:
+    ssh:
+      host: "dpdk-gateway.testlab.com"
+      user: "dpdk"
+      key_path: "~/.ssh/dpdk_key"
+    role: "intermediate"
+    runner:
+      port: 5201
+      target_host: "10.100.1.10"  # Server's high-speed network interface
+      # DPDK-specific configuration
+      args:
+        # TestPMD forwarding configuration
+        dpdk_mode: "io"         # I/O forwarding mode
+        cores: "1,2,3,4"        # CPU cores for DPDK
+        memory_channels: 4       # Memory channels
+        huge_pages: "2G"        # Huge page allocation
+        ports: "0,1"            # DPDK ports to use
+        forward_mode: "io"      # Packet forwarding mode
+        burst_size: 64          # RX/TX burst size
+
+  # Network performance client
+  perf_client:
+    ssh:
+      host: "dpdk-client.testlab.com"
+      user: "dpdk"
+      key_path: "~/.ssh/dpdk_key"
+    role: "client"
+    runner:
+      target_host: "10.100.1.20"  # DPDK forwarder's high-speed interface
+
+tests:
+  - name: "Single Stream via DPDK TestPMD"
+    description: "Single TCP stream through DPDK packet forwarding"
+    client: "perf_client"
+    server: "perf_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 60s
+      args:
+        parallel_streams: 1
+        window_size: "8M"
+        
+  - name: "Multi-Stream via DPDK TestPMD"
+    description: "Multiple parallel streams through DPDK"
+    client: "perf_client"
+    server: "perf_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 120s
+      args:
+        parallel_streams: 8
+        window_size: "16M"
+        
+  - name: "UDP Performance via DPDK TestPMD"
+    description: "UDP throughput through DPDK packet forwarding"
+    client: "perf_client"
+    server: "perf_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 60s
+      args:
+        udp: true
+        bandwidth: "10G"
+        parallel_streams: 4
+        
+  - name: "High Bandwidth Test"
+    description: "Maximum throughput test through DPDK"
+    client: "perf_client"
+    server: "perf_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 180s
+      args:
+        parallel_streams: 16
+        window_size: "32M"
+        congestion_control: "bbr"
+        
+  # Baseline test without DPDK forwarder for comparison
+  - name: "Direct Connection Baseline"
+    description: "Direct connection without DPDK forwarder"
+    client: "perf_client"
+    server: "perf_server"
+    # No intermediate node specified
+    config:
+      duration: 60s
+      args:
+        parallel_streams: 8
+        window_size: "16M"
