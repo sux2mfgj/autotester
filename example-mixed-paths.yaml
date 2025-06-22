@@ -1,0 +1,48 @@
+name: "Mixed Environment Test"
+description: "Different hosts with different binary installations"
+runner: "iperf3"
+timeout: 5m
+
+# Binary paths for tools installed in non-standard locations
+binary_paths:
+  iperf3: "/home/user/custom-tools/iperf3"
+  ib_send_bw: "/usr/local/perftest/ib_send_bw"
+
+hosts:
+  tcp_server:
+    ssh:
+      host: "test-server.local"
+      user: "admin"
+      key_path: "/home/user/.ssh/test_key"
+    role: "server"
+    runner:
+      port: 5201
+
+  tcp_client:
+    ssh:
+      host: "test-client.local"
+      user: "admin"
+      key_path: "/home/user/.ssh/test_key"
+    role: "client"
+    runner:
+      target_host: "10.1.0.10"  # Test network
+
+tests:
+  - name: "TCP Bandwidth Test"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 60s
+      args:
+        parallel_streams: 4
+        window_size: "1M"
+        
+  - name: "UDP Test"
+    client: "tcp_client"
+    server: "tcp_server"
+    config:
+      duration: 30s
+      args:
+        udp: true
+        bandwidth: "100M"
+        parallel_streams: 1

@@ -1,0 +1,39 @@
+name: "Standard Installation Test"
+description: "Using default binary paths from system PATH"
+runner: "ib_send_bw"
+timeout: 15m
+
+# No binary_paths section - will use default tool names from PATH
+# This is equivalent to the old behavior
+
+hosts:
+  server01:
+    ssh:
+      host: "hpc-node1.cluster.local"
+      user: "hpcuser"
+      key_path: "~/.ssh/cluster_key"
+    role: "server"
+    runner:
+      port: 18515
+
+  client01:
+    ssh:
+      host: "hpc-node2.cluster.local"
+      user: "hpcuser"
+      key_path: "~/.ssh/cluster_key"
+    role: "client"
+
+tests:
+  - name: "Production Benchmark"
+    description: "Standard production benchmark suite"
+    client: "client01"
+    server: "server01"
+    repeat: 3
+    config:
+      duration: 120s
+      args:
+        size: 4194304  # 4MB
+        iterations: 500
+        connection: "RC"
+        ib_dev: "mlx5_0"
+        gid_index: 3

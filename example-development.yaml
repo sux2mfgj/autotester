@@ -1,0 +1,51 @@
+name: "Development Environment"
+description: "Testing with locally compiled binaries"
+runner: "ib_send_bw"
+timeout: 5m
+
+# Point to locally compiled development versions
+binary_paths:
+  ib_send_bw: "./build/debug/ib_send_bw"  # Relative path to local build
+  iperf3: "/opt/iperf3-dev/bin/iperf3"    # Development version
+
+hosts:
+  dev_server:
+    ssh:
+      host: "localhost"
+      user: "developer"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    runner:
+      port: 18515
+
+  dev_client:
+    ssh:
+      host: "dev-vm.local"
+      user: "developer"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+    runner:
+      target_host: "127.0.0.1"
+
+tests:
+  - name: "Quick Development Test"
+    description: "Fast test for development cycle"
+    client: "dev_client"
+    server: "dev_server"
+    config:
+      duration: 5s
+      args:
+        size: 1024
+        iterations: 100
+        
+  - name: "Debug Test"
+    description: "Verbose test for debugging"
+    client: "dev_client"
+    server: "dev_server"
+    config:
+      duration: 10s
+      args:
+        size: 65536
+        iterations: 50
+        report_gbits: true
+        verbose: true

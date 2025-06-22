@@ -1,0 +1,51 @@
+name: "InfiniBand Bandwidth Test with Custom Binary"
+description: "Test using custom perftest binary location"
+runner: "ib_send_bw"
+timeout: 10m
+
+# Custom binary paths - specify exact location of test tools
+binary_paths:
+  ib_send_bw: "/opt/mellanox/perftest/bin/ib_send_bw"
+  iperf3: "/usr/local/bin/iperf3"
+
+hosts:
+  ib_server:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    runner:
+      port: 18515
+
+  ib_client:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+    runner:
+      target_host: "10.0.0.100"  # InfiniBand network IP
+
+tests:
+  - name: "High Bandwidth Test"
+    description: "64KB messages for maximum bandwidth"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 30s
+      args:
+        size: 65536
+        iterations: 1000
+        connection: "RC"
+        
+  - name: "Low Latency Test"
+    description: "Small messages for latency testing"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 10s
+      args:
+        size: 8
+        iterations: 10000
+        connection: "UC"
