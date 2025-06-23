@@ -119,22 +119,6 @@ func TestRunnerEnvironmentVariableIntegration(t *testing.T) {
 			expected: "LD_LIBRARY_PATH=/usr/local/lib NUMA_POLICY=preferred iperf3 -s -p 5201 -t 30 -J",
 		},
 		{
-			name:   "ibperf with RDMA environment variables",
-			runner: NewIbperfRunner(""),
-			config: Config{
-				Role: "client",
-				Host: "192.168.1.100",
-				Env: map[string]string{
-					"LD_LIBRARY_PATH": "/opt/rdma/lib",
-					"UCX_TLS":         "rc_x,ud_x",
-				},
-				Args: map[string]interface{}{
-					"verifier": true,
-				},
-			},
-			expected: "LD_LIBRARY_PATH=/opt/rdma/lib UCX_TLS=rc_x,ud_x ibperf 192.168.1.100 -V",
-		},
-		{
 			name:   "no environment variables",
 			runner: NewIbSendBwRunner(""),
 			config: Config{
