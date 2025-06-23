@@ -18,6 +18,9 @@ type TestConfig struct {
 	Runner      string              `yaml:"runner"`
 	Timeout     time.Duration       `yaml:"timeout"`
 	
+	// Environment information collection
+	CollectEnv  bool                `yaml:"collect_env,omitempty"`
+	
 	// Binary path configurations
 	BinaryPaths map[string]string   `yaml:"binary_paths,omitempty"`
 	

@@ -1,0 +1,37 @@
+name: "Environment Collection Example"
+description: "Demonstrates environment information collection in config"
+runner: "iperf3"
+timeout: 5m
+
+# Enable environment information collection in config
+collect_env: true
+
+# Optional: Custom binary paths (commented out for testing)
+# binary_paths:
+#   iperf3: "/usr/bin/iperf3"
+
+hosts:
+  server1:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    
+  client1:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+
+tests:
+  - name: "Basic Throughput Test with Environment Info"
+    description: "Tests network performance and collects environment data"
+    client: "client1"
+    server: "server1"
+    config:
+      duration: 30s
+      args:
+        bandwidth: "1G"
+        parallel: 4

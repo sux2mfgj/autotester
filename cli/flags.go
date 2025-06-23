@@ -12,11 +12,11 @@ const (
 
 // Flags represents command line flags
 type Flags struct {
-	ConfigFile *string
-	Timeout    *time.Duration
-	Verbose    *bool
-	JSONOutput *bool
-	Version    *bool
+	ConfigFile  *string
+	Timeout     *time.Duration
+	Verbose     *bool
+	JSONOutput  *bool
+	Version     *bool
 }
 
 // NewFlags creates and parses command line flags

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"perf-runner/config"
+	"perf-runner/envinfo"
 	"perf-runner/runner"
 	"perf-runner/ssh"
 )
@@ -118,6 +119,13 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 		// 2-node topology (original)
 		if err := e.executeClientServerTest(testCtx, r, clientSSH, serverSSH, clientConfig, serverConfig, result, test); err != nil {
 			return nil, err
+		}
+	}
+	
+	// Collect environment information if requested
+	if e.coordinator.collectEnv {
+		if err := e.collectEnvironmentInfo(testCtx, result, test, clientSSH, serverSSH, intermediateSSH); err != nil {
+			e.coordinator.logger.Printf("Warning: failed to collect environment info: %v", err)
 		}
 	}
 	
@@ -303,4 +311,46 @@ func (e *TestExecutor) runRemoteCommand(ctx context.Context, sshClient *ssh.Clie
 	}
 	
 	return runnerResult, nil
+}
+
+// collectEnvironmentInfo gathers environment information from all hosts
+func (e *TestExecutor) collectEnvironmentInfo(ctx context.Context, result *TestResult, test *config.TestScenario, clientSSH, serverSSH, intermediateSSH *ssh.Client) error {
+	e.coordinator.logger.Printf("  Collecting environment information...")
+	
+	result.EnvironmentInfo = &EnvironmentData{}
+	
+	// Collect client environment
+	if clientSSH != nil {
+		collector := envinfo.NewCollector(clientSSH)
+		if envInfo, err := collector.Collect(ctx); err != nil {
+			e.coordinator.logger.Printf("  Warning: failed to collect client environment: %v", err)
+		} else {
+			result.EnvironmentInfo.ClientEnv = envInfo
+			e.coordinator.logger.Printf("  Collected client environment from %s", test.Client)
+		}
+	}
+	
+	// Collect server environment
+	if serverSSH != nil {
+		collector := envinfo.NewCollector(serverSSH)
+		if envInfo, err := collector.Collect(ctx); err != nil {
+			e.coordinator.logger.Printf("  Warning: failed to collect server environment: %v", err)
+		} else {
+			result.EnvironmentInfo.ServerEnv = envInfo
+			e.coordinator.logger.Printf("  Collected server environment from %s", test.Server)
+		}
+	}
+	
+	// Collect intermediate environment if applicable
+	if intermediateSSH != nil {
+		collector := envinfo.NewCollector(intermediateSSH)
+		if envInfo, err := collector.Collect(ctx); err != nil {
+			e.coordinator.logger.Printf("  Warning: failed to collect intermediate environment: %v", err)
+		} else {
+			result.EnvironmentInfo.IntermediateEnv = envInfo
+			e.coordinator.logger.Printf("  Collected intermediate environment from %s", test.Intermediate)
+		}
+	}
+	
+	return nil
 }

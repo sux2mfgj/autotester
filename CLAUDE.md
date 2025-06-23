@@ -15,6 +15,9 @@ go build -o perf-runner
 
 # JSON output with verbose logging
 ./perf-runner -json -verbose -config mytest.yaml
+
+# Run with environment collection (enabled in config file)
+./perf-runner -config mytest.yaml
 ```
 
 ### Testing
@@ -77,6 +80,11 @@ This is a Go-based InfiniBand/network performance testing tool that orchestrates
 
 - **Output** (`output/`): Result formatting (JSON/text)
 
+- **EnvInfo** (`envinfo/`): Environment information collection
+  - Gathers system information from test hosts
+  - Collects NIC info, kernel version, software versions
+  - Supports both local and remote collection via SSH
+
 ### Key Design Patterns
 
 - **Registry Pattern**: Runners auto-register via `init()` functions
@@ -100,6 +108,40 @@ Tests are defined in YAML with these main sections:
 - **Tests**: Client-server test scenarios
 - **Binary Paths**: Custom paths for test tools (optional)
 - **Runner-specific**: Tool parameters (duration, args, etc.)
+
+## Environment Information Collection
+
+The `-env` flag enables collection of comprehensive environment information from all test hosts:
+
+**Collected Information:**
+- **System**: Hostname, kernel version, OS info, architecture
+- **CPU**: Model, cores, threads, frequency
+- **Memory**: Total, available, used memory
+- **Network Interfaces**: Name, IP addresses, MAC address, MTU, status, speed, driver
+- **Software Versions**: ib_send_bw, iperf3, DPDK, socat, SSH versions
+
+**Configuration:**
+```yaml
+name: "My Test"
+runner: "iperf3"
+collect_env: true  # Enable environment collection
+
+hosts:
+  # ... host definitions
+tests:
+  # ... test definitions
+```
+
+**Usage:**
+```bash
+# Run with environment collection (if enabled in config)
+./perf-runner -config config.yaml
+
+# Combine with JSON output for detailed environment data
+./perf-runner -json -config config.yaml
+```
+
+**Output:** Environment information is included in test results under the `environment_info` field with separate sections for client, server, and intermediate hosts.
 
 Example configuration with intermediate node:
 ```yaml

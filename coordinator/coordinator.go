@@ -19,6 +19,7 @@ type Coordinator struct {
 	sshClients map[string]*ssh.Client
 	logger    *log.Logger
 	mu        sync.RWMutex
+	collectEnv bool
 }
 
 // NewCoordinator creates a new test coordinator
@@ -32,7 +33,13 @@ func NewCoordinator(cfg *config.TestConfig, logger *log.Logger) *Coordinator {
 		runners:    make(map[string]runner.Runner),
 		sshClients: make(map[string]*ssh.Client),
 		logger:     logger,
+		collectEnv: false,
 	}
+}
+
+// SetEnvironmentCollection enables or disables environment information collection
+func (c *Coordinator) SetEnvironmentCollection(enabled bool) {
+	c.collectEnv = enabled
 }
 
 // RegisterRunner registers a runner implementation

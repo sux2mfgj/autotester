@@ -174,6 +174,11 @@ func (c *Client) ExecuteCommandAsync(ctx context.Context, command string) error 
 	return nil
 }
 
+// Config returns the SSH configuration
+func (c *Client) Config() *Config {
+	return c.config
+}
+
 // Close closes the SSH connection
 func (c *Client) Close() error {
 	if c.client != nil {

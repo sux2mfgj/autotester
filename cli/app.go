@@ -74,6 +74,12 @@ func (a *App) Run() error {
 	coord := coordinator.NewCoordinator(cfg, a.logger)
 	defer coord.Cleanup()
 	
+	// Set environment collection if enabled in config
+	if cfg.CollectEnv {
+		coord.SetEnvironmentCollection(true)
+		a.logger.Printf("Environment information collection enabled")
+	}
+	
 	// Register runners
 	if err := a.registerRunners(coord, cfg); err != nil {
 		return fmt.Errorf("failed to register runners: %w", err)
