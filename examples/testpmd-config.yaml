@@ -1,0 +1,243 @@
+name: "DPDK testpmd Packet Forwarding Test"
+description: "Test packet forwarding performance using DPDK testpmd as intermediate node"
+runner: "testpmd"
+timeout: 10m
+collect_env: true
+
+# Optional: specify custom paths for binaries
+binary_paths:
+  testpmd: "/usr/local/bin/dpdk-testpmd"
+  iperf3: "/usr/bin/iperf3"
+
+hosts:
+  traffic_generator:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+    env:
+      LD_LIBRARY_PATH: "/usr/local/lib"
+      
+  packet_forwarder:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "intermediate"
+    # DPDK/testpmd specific environment
+    env:
+      LD_LIBRARY_PATH: "/usr/local/lib:/opt/dpdk/lib"
+      RTE_SDK: "/opt/dpdk"
+      RTE_TARGET: "x86_64-native-linuxapp-gcc"
+      DPDK_LOG_LEVEL: "info"
+      
+  traffic_receiver:
+    ssh:
+      host: "192.168.1.102"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    env:
+      LD_LIBRARY_PATH: "/usr/local/lib"
+
+tests:
+  - name: "Basic DPDK L2 Forwarding"
+    description: "Basic Layer 2 packet forwarding with testpmd"
+    client: "traffic_generator"
+    server: "traffic_receiver"
+    intermediate: "packet_forwarder"
+    config:
+      duration: 60s
+      # Common configuration
+      args:
+        runner: "iperf3"
+        protocol: "tcp"
+        parallel_streams: 1
+      # testpmd-specific configuration for intermediate node
+      intermediate_args:
+        # EAL (Environment Abstraction Layer) parameters
+        cores: "0-3"                    # Use cores 0-3
+        memory_channels: 4              # Memory channels
+        hugepage_dir: "/mnt/huge"       # Hugepage directory
+        file_prefix: "testpmd"          # File prefix for multi-process
+        
+        # PCI device allowlist
+        allow_pci: ["0000:01:00.0", "0000:01:00.1"]  # Network interfaces
+        
+        # Application parameters
+        ports: "0,1"                    # Use ports 0 and 1
+        rx_queues: 2                    # 2 RX queues per port
+        tx_queues: 2                    # 2 TX queues per port
+        rx_descriptors: 1024            # RX ring size
+        tx_descriptors: 1024            # TX ring size
+        burst_size: 32                  # Burst size for packet processing
+        
+        # Forwarding configuration
+        forward_mode: "mac"             # MAC forwarding mode
+        auto_start: true                # Auto-start forwarding
+        interactive: false              # Non-interactive mode
+        stats_period: 5                 # Statistics period in seconds
+        
+        # Performance optimizations
+        disable_rss: false              # Keep RSS enabled
+        flow_control: "none"            # Disable flow control
+        hw_vlan: true                   # Enable hardware VLAN
+        crc_strip: true                 # Enable CRC stripping
+      
+      # Environment specific to intermediate role
+      intermediate_env:
+        DPDK_LOG_LEVEL: "debug"
+        RTE_LOG_LEVEL: "info"
+
+  - name: "High Performance L2 Forwarding"
+    description: "High performance forwarding with optimized settings"
+    client: "traffic_generator"
+    server: "traffic_receiver"
+    intermediate: "packet_forwarder"
+    config:
+      duration: 120s
+      args:
+        runner: "iperf3"
+        protocol: "tcp"
+        parallel_streams: 4
+        bitrate: "10G"
+      intermediate_args:
+        # More cores for higher performance
+        cores: "0-7"
+        memory_channels: 4
+        hugepage_dir: "/mnt/huge"
+        
+        # Multiple ports for load balancing
+        allow_pci: ["0000:01:00.0", "0000:01:00.1", "0000:02:00.0", "0000:02:00.1"]
+        ports: "0,1,2,3"
+        
+        # Increased queues and descriptors
+        rx_queues: 4
+        tx_queues: 4
+        rx_descriptors: 2048
+        tx_descriptors: 2048
+        burst_size: 64
+        
+        # Optimized forwarding
+        forward_mode: "io"              # IO forwarding (fastest)
+        forward_cores: "0x0F"           # Core mask for forwarding
+        auto_start: true
+        stats_period: 1
+        
+        # Performance tuning
+        disable_rss: false
+        flow_control: "none"
+        hw_vlan: true
+        crc_strip: true
+
+  - name: "VLAN Tagged Traffic Forwarding"
+    description: "Forward VLAN tagged packets with VLAN stripping/insertion"
+    client: "traffic_generator"
+    server: "traffic_receiver"
+    intermediate: "packet_forwarder"
+    config:
+      duration: 90s
+      args:
+        runner: "iperf3"
+        protocol: "tcp"
+        parallel_streams: 2
+      intermediate_args:
+        cores: "0-3"
+        memory_channels: 4
+        allow_pci: ["0000:01:00.0", "0000:01:00.1"]
+        ports: "0,1"
+        rx_queues: 2
+        tx_queues: 2
+        rx_descriptors: 1024
+        tx_descriptors: 1024
+        
+        # VLAN handling
+        forward_mode: "macswap"         # MAC swap mode for VLAN testing
+        hw_vlan: true                   # Hardware VLAN support
+        auto_start: true
+        stats_period: 5
+
+  - name: "Virtual Device Forwarding"
+    description: "Test with virtual devices (useful for containers/VMs)"
+    client: "traffic_generator"
+    server: "traffic_receiver"
+    intermediate: "packet_forwarder"
+    config:
+      duration: 60s
+      args:
+        runner: "iperf3"
+        protocol: "tcp"
+        parallel_streams: 1
+      intermediate_args:
+        cores: "0-1"
+        memory_channels: 2
+        file_prefix: "vdev_test"
+        
+        # Virtual devices instead of physical NICs
+        vdev: ["net_tap0,iface=tap0", "net_tap1,iface=tap1"]
+        ports: "0,1"
+        
+        rx_queues: 1
+        tx_queues: 1
+        rx_descriptors: 512
+        tx_descriptors: 512
+        
+        forward_mode: "io"
+        auto_start: true
+        interactive: false
+
+  - name: "Packet Generation Mode"
+    description: "Use testpmd as packet generator (flowgen mode)"
+    client: "packet_forwarder"  # testpmd acts as client
+    server: "traffic_receiver"
+    config:
+      duration: 45s
+      args:
+        # No iperf3 needed, testpmd generates traffic
+        runner: "testpmd"
+      client_args:  # testpmd as client/generator
+        cores: "0-3"
+        memory_channels: 4
+        allow_pci: ["0000:01:00.0"]
+        ports: "0"
+        
+        rx_queues: 1
+        tx_queues: 1
+        rx_descriptors: 1024
+        tx_descriptors: 1024
+        
+        # Flow generation mode
+        forward_mode: "flowgen"         # Generate packets
+        auto_start: true
+        stats_period: 5
+        burst_size: 32
+
+  - name: "Checksum Offload Testing"
+    description: "Test hardware checksum offload capabilities"
+    client: "traffic_generator"
+    server: "traffic_receiver"
+    intermediate: "packet_forwarder"
+    config:
+      duration: 60s
+      args:
+        runner: "iperf3"
+        protocol: "tcp"
+        parallel_streams: 1
+      intermediate_args:
+        cores: "0-3"
+        memory_channels: 4
+        allow_pci: ["0000:01:00.0", "0000:01:00.1"]
+        ports: "0,1"
+        
+        rx_queues: 2
+        tx_queues: 2
+        rx_descriptors: 1024
+        tx_descriptors: 1024
+        
+        # Checksum testing
+        forward_mode: "csum"            # Checksum mode
+        auto_start: true
+        stats_period: 5
+        hw_vlan: true
+        crc_strip: true
