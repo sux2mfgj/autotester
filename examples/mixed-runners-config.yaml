@@ -1,0 +1,331 @@
+name: "Mixed Runners: iperf3 + DPDK testpmd Performance Test"
+description: "Use iperf3 for end-to-end measurement with DPDK testpmd for intermediate packet forwarding"
+timeout: 15m
+collect_env: true
+
+# Per-role runner specification - the key feature!
+runners:
+  client: "iperf3"          # iperf3 for network measurement
+  server: "iperf3"          # iperf3 for network measurement  
+  intermediate: "testpmd"   # DPDK testpmd for packet forwarding
+
+# Binary paths for both runners (optional - remove if not needed)
+# binary_paths:
+#   iperf3: "/usr/bin/iperf3"  
+#   testpmd: "/usr/local/bin/dpdk-testpmd"
+
+hosts:
+  # iperf3 client - traffic generator and measurement
+  traffic_client:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+    # Standard environment for iperf3
+    env:
+      LD_LIBRARY_PATH: "/usr/local/lib"
+      
+  # DPDK testpmd forwarder - high-performance packet forwarding
+  dpdk_forwarder:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "intermediate"
+    # DPDK-optimized environment
+    env:
+      LD_LIBRARY_PATH: "/usr/local/lib:/opt/dpdk/lib"
+      RTE_SDK: "/opt/dpdk"
+      RTE_TARGET: "x86_64-native-linuxapp-gcc"
+      DPDK_LOG_LEVEL: "info"
+      RTE_LOG_LEVEL: "info"
+      
+  # iperf3 server - traffic receiver and measurement
+  traffic_server:
+    ssh:
+      host: "192.168.1.102"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    # Standard environment for iperf3
+    env:
+      LD_LIBRARY_PATH: "/usr/local/lib"
+
+tests:
+  # Test 1: Basic TCP Performance via DPDK Forwarding
+  - name: "TCP Performance via DPDK L2 Forwarding"
+    description: "Measure TCP bandwidth with DPDK packet forwarding"
+    client: "traffic_client"
+    server: "traffic_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 60s
+      
+      # iperf3 client configuration
+      client_args:
+        protocol: "tcp"
+        parallel_streams: 1
+        interval: 5
+        window_size: "1M"
+        bitrate: "1G"
+        
+      # testpmd intermediate forwarding configuration  
+      intermediate_args:
+        cores: "0-7"
+        memory_channels: 4
+        hugepage_dir: "/mnt/huge"
+        file_prefix: "fwd"
+        allow_pci: ["0000:02:00.0", "0000:02:00.1"]
+        ports: "0,1"
+        rx_queues: 4
+        tx_queues: 4
+        rx_descriptors: 2048
+        tx_descriptors: 2048
+        burst_size: 64
+        forward_mode: "io"                  # Fast L2 forwarding
+        auto_start: true
+        stats_period: 5
+        interactive: true
+        
+      # iperf3 server configuration
+      server_args:
+        bind_address: "0.0.0.0"
+        interval: 5
+
+  # Test 2: High Performance Multi-Stream via DPDK
+  - name: "Multi-Stream TCP via High-Performance DPDK"
+    description: "Multiple parallel TCP streams through optimized DPDK forwarding"
+    client: "traffic_client"
+    server: "traffic_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 120s
+      
+      # iperf3 client - multiple streams
+      client_args:
+        protocol: "tcp"
+        parallel_streams: 8               # 8 parallel connections
+        interval: 5
+        window_size: "2M"
+        bitrate: "10G"
+        
+      # testpmd - optimized for high performance
+      intermediate_args:
+        cores: "0-15"                     # Use all 16 cores
+        memory_channels: 4
+        hugepage_dir: "/mnt/huge"
+        file_prefix: "hiperf"
+        allow_pci: ["0000:02:00.0", "0000:02:00.1", "0000:04:00.0", "0000:04:00.1"]
+        ports: "0,1,2,3"                  # 4 ports for load balancing
+        rx_queues: 8                      # Many queues for parallel processing
+        tx_queues: 8
+        rx_descriptors: 4096              # Large buffers
+        tx_descriptors: 4096
+        burst_size: 128                   # Large burst for throughput
+        forward_mode: "io"
+        forward_cores: "0xFF"             # Dedicated forwarding cores
+        auto_start: true
+        stats_period: 2
+        # Performance optimizations
+        disable_rss: false                # RSS for load distribution
+        flow_control: "none"
+        hw_vlan: true
+        crc_strip: true
+        interactive: true
+        
+      # iperf3 server
+      server_args:
+        bind_address: "0.0.0.0"
+        interval: 5
+
+  # Test 3: UDP Performance with DPDK MAC Learning
+  - name: "UDP Performance via DPDK MAC Learning"
+    description: "UDP traffic with DPDK MAC address learning forwarding"
+    client: "traffic_client"
+    server: "traffic_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 90s
+      
+      # iperf3 client - UDP mode
+      client_args:
+        protocol: "udp"
+        parallel_streams: 4
+        bitrate: "5G"
+        interval: 5
+        buffer_length: "64K"
+        
+      # testpmd - MAC learning mode
+      intermediate_args:
+        cores: "0-7"
+        memory_channels: 4
+        allow_pci: ["0000:02:00.0", "0000:02:00.1"]
+        ports: "0,1"
+        rx_queues: 4
+        tx_queues: 4
+        rx_descriptors: 1024
+        tx_descriptors: 1024
+        forward_mode: "mac"               # MAC address learning
+        auto_start: true
+        stats_period: 5
+        interactive: true
+        
+      # iperf3 server - UDP
+      server_args:
+        bind_address: "0.0.0.0"
+        interval: 5
+
+  # Test 4: IPv6 Performance via DPDK
+  - name: "IPv6 TCP Performance via DPDK"
+    description: "IPv6 traffic forwarding through DPDK testpmd"
+    client: "traffic_client"
+    server: "traffic_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 75s
+      
+      # iperf3 client - IPv6
+      client_args:
+        protocol: "tcp"
+        ipv6: true
+        parallel_streams: 2
+        interval: 5
+        bitrate: "2G"
+        
+      # testpmd - standard forwarding
+      intermediate_args:
+        cores: "0-7"
+        memory_channels: 4
+        allow_pci: ["0000:02:00.0", "0000:02:00.1"]
+        ports: "0,1"
+        rx_queues: 2
+        tx_queues: 2
+        rx_descriptors: 1024
+        tx_descriptors: 1024
+        forward_mode: "io"
+        auto_start: true
+        stats_period: 5
+        interactive: true
+        
+      # iperf3 server - IPv6
+      server_args:
+        ipv6: true
+        bind_address: "::"
+        interval: 5
+
+  # Test 5: Reverse Direction Performance Test
+  - name: "Reverse Direction Performance via DPDK"
+    description: "Test reverse direction traffic (server to client) via DPDK"
+    client: "traffic_client"
+    server: "traffic_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 60s
+      
+      # iperf3 client - reverse mode
+      client_args:
+        protocol: "tcp"
+        reverse: true                     # Server sends to client
+        parallel_streams: 4
+        interval: 5
+        bitrate: "5G"
+        
+      # testpmd - bidirectional forwarding
+      intermediate_args:
+        cores: "0-7"
+        memory_channels: 4
+        allow_pci: ["0000:02:00.0", "0000:02:00.1"]
+        ports: "0,1"
+        rx_queues: 4
+        tx_queues: 4
+        rx_descriptors: 2048
+        tx_descriptors: 2048
+        forward_mode: "macswap"           # MAC swap for bidirectional
+        auto_start: true
+        stats_period: 5
+        interactive: true
+        
+      # iperf3 server
+      server_args:
+        bind_address: "0.0.0.0"
+        interval: 5
+
+  # Test 6: VLAN Tagged Traffic via DPDK
+  - name: "VLAN Tagged Performance via DPDK"
+    description: "VLAN tagged traffic forwarding with hardware acceleration"
+    client: "traffic_client"
+    server: "traffic_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 90s
+      
+      # iperf3 client - will send regular traffic
+      client_args:
+        protocol: "tcp"
+        parallel_streams: 2
+        interval: 5
+        bitrate: "3G"
+        
+      # testpmd - VLAN processing
+      intermediate_args:
+        cores: "0-7"
+        memory_channels: 4
+        allow_pci: ["0000:02:00.0", "0000:02:00.1"]
+        ports: "0,1"
+        rx_queues: 2
+        tx_queues: 2
+        rx_descriptors: 1024
+        tx_descriptors: 1024
+        forward_mode: "macswap"
+        hw_vlan: true                     # Hardware VLAN support
+        auto_start: true
+        stats_period: 5
+        interactive: true
+        
+      # iperf3 server
+      server_args:
+        bind_address: "0.0.0.0"
+        interval: 5
+        
+      # Environment specific to VLAN testing
+      intermediate_env:
+        DPDK_LOG_LEVEL: "debug"          # More detailed logging for VLAN debugging
+
+  # Test 7: Virtual Interface Performance
+  - name: "Virtual Interface Performance Test"
+    description: "Test performance through virtual TAP interfaces with iperf3 measurement"
+    client: "traffic_client"
+    server: "traffic_server"
+    intermediate: "dpdk_forwarder"
+    config:
+      duration: 60s
+      
+      # iperf3 client
+      client_args:
+        protocol: "tcp"
+        parallel_streams: 1
+        interval: 10
+        bitrate: "1G"
+        
+      # testpmd with virtual devices
+      intermediate_args:
+        cores: "0-3"
+        memory_channels: 2
+        file_prefix: "vdev_test"
+        # Virtual TAP devices
+        vdev: ["net_tap0,iface=tap_in", "net_tap1,iface=tap_out"]
+        ports: "0,1"
+        rx_queues: 1
+        tx_queues: 1
+        rx_descriptors: 512
+        tx_descriptors: 512
+        forward_mode: "io"
+        auto_start: true
+        stats_period: 10
+        interactive: true
+        
+      # iperf3 server
+      server_args:
+        bind_address: "0.0.0.0"
+        interval: 10

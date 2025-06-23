@@ -15,7 +15,11 @@ import (
 type TestConfig struct {
 	Name        string              `yaml:"name"`
 	Description string              `yaml:"description,omitempty"`
-	Runner      string              `yaml:"runner"`
+	
+	// Runner configuration - supports both single runner and per-role runners
+	Runner      string              `yaml:"runner,omitempty"`      // Single runner for all roles (legacy)
+	Runners     *RoleRunners        `yaml:"runners,omitempty"`     // Per-role runner specification
+	
 	Timeout     time.Duration       `yaml:"timeout"`
 	
 	// Environment information collection
@@ -29,6 +33,13 @@ type TestConfig struct {
 	
 	// Test scenarios
 	Tests       []TestScenario         `yaml:"tests"`
+}
+
+// RoleRunners allows specifying different runners per role
+type RoleRunners struct {
+	Client       string `yaml:"client"`                // Runner for client role
+	Server       string `yaml:"server"`                // Runner for server role  
+	Intermediate string `yaml:"intermediate,omitempty"` // Runner for intermediate role
 }
 
 // HostConfig represents configuration for a single host
@@ -78,6 +89,47 @@ func LoadConfig(filename string) (*TestConfig, error) {
 	return &config, nil
 }
 
+// GetRunnerForRole returns the appropriate runner name for the given role
+func (c *TestConfig) GetRunnerForRole(role string) string {
+	// If per-role runners are specified, use those
+	if c.Runners != nil {
+		switch role {
+		case "client":
+			if c.Runners.Client != "" {
+				return c.Runners.Client
+			}
+		case "server":
+			if c.Runners.Server != "" {
+				return c.Runners.Server
+			}
+		case "intermediate":
+			if c.Runners.Intermediate != "" {
+				return c.Runners.Intermediate
+			}
+		}
+	}
+	
+	// Fall back to the single runner configuration
+	return c.Runner
+}
+
+// HasMixedRunners returns true if different runners are specified for different roles
+func (c *TestConfig) HasMixedRunners() bool {
+	if c.Runners == nil {
+		return false
+	}
+	
+	runners := []string{c.Runners.Client, c.Runners.Server, c.Runners.Intermediate}
+	unique := make(map[string]bool)
+	
+	for _, runner := range runners {
+		if runner != "" {
+			unique[runner] = true
+		}
+	}
+	
+	return len(unique) > 1
+}
 
 // GetClientHost returns the client host configuration for a test
 func (c *TestConfig) GetClientHost(test *TestScenario) *HostConfig {

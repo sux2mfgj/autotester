@@ -30,10 +30,28 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 		StartTime:    startTime,
 	}
 	
-	// Get runner
-	r, exists := e.coordinator.runners[e.coordinator.config.Runner]
+	// Get role-specific runners
+	clientRunnerName := e.coordinator.config.GetRunnerForRole("client")
+	serverRunnerName := e.coordinator.config.GetRunnerForRole("server")
+	
+	clientRunner, exists := e.coordinator.runners[clientRunnerName]
 	if !exists {
-		return nil, fmt.Errorf("runner %s not found", e.coordinator.config.Runner)
+		return nil, fmt.Errorf("client runner %s not found", clientRunnerName)
+	}
+	
+	serverRunner, exists := e.coordinator.runners[serverRunnerName]
+	if !exists {
+		return nil, fmt.Errorf("server runner %s not found", serverRunnerName)
+	}
+	
+	var intermediateRunner runner.Runner
+	if e.coordinator.config.HasIntermediateNode(test) {
+		intermediateRunnerName := e.coordinator.config.GetRunnerForRole("intermediate")
+		var exists bool
+		intermediateRunner, exists = e.coordinator.runners[intermediateRunnerName]
+		if !exists {
+			return nil, fmt.Errorf("intermediate runner %s not found", intermediateRunnerName)
+		}
 	}
 	
 	// Get host configurations
@@ -112,12 +130,12 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	// Execute the test based on topology
 	if e.coordinator.config.HasIntermediateNode(test) {
 		// 3-node topology
-		if err := e.executeThreeNodeTest(testCtx, r, clientSSH, intermediateSSH, serverSSH, clientConfig, intermediateConfig, serverConfig, result, test); err != nil {
+		if err := e.executeThreeNodeTest(testCtx, clientRunner, intermediateRunner, serverRunner, clientSSH, intermediateSSH, serverSSH, clientConfig, intermediateConfig, serverConfig, result, test); err != nil {
 			return nil, err
 		}
 	} else {
 		// 2-node topology (original)
-		if err := e.executeClientServerTest(testCtx, r, clientSSH, serverSSH, clientConfig, serverConfig, result, test); err != nil {
+		if err := e.executeClientServerTest(testCtx, clientRunner, serverRunner, clientSSH, serverSSH, clientConfig, serverConfig, result, test); err != nil {
 			return nil, err
 		}
 	}
@@ -142,15 +160,15 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 // executeClientServerTest handles the coordination between client and server
 func (e *TestExecutor) executeClientServerTest(
 	ctx context.Context,
-	r runner.Runner,
+	clientRunner, serverRunner runner.Runner,
 	clientSSH, serverSSH *ssh.Client,
 	clientConfig, serverConfig *runner.Config,
 	result *TestResult,
 	test *config.TestScenario,
 ) error {
-	// Build commands for display using runner's own method
-	result.ServerCommand = r.BuildCommand(*serverConfig)
-	result.ClientCommand = r.BuildCommand(*clientConfig)
+	// Build commands for display using role-specific runners
+	result.ServerCommand = serverRunner.BuildCommand(*serverConfig)
+	result.ClientCommand = clientRunner.BuildCommand(*clientConfig)
 	
 	// Start server first
 	e.coordinator.logger.Printf("  Starting server on %s", test.Server)
@@ -158,7 +176,7 @@ func (e *TestExecutor) executeClientServerTest(
 	serverErr := make(chan error, 1)
 	
 	go func() {
-		serverResult, err := e.runRemoteCommand(ctx, serverSSH, r, serverConfig)
+		serverResult, err := e.runRemoteCommand(ctx, serverSSH, serverRunner, serverConfig)
 		if err != nil {
 			serverErr <- err
 			return
@@ -171,7 +189,7 @@ func (e *TestExecutor) executeClientServerTest(
 	
 	// Start client
 	e.coordinator.logger.Printf("  Starting client on %s", test.Client)
-	clientResult, err := e.runRemoteCommand(ctx, clientSSH, r, clientConfig)
+	clientResult, err := e.runRemoteCommand(ctx, clientSSH, clientRunner, clientConfig)
 	if err != nil {
 		return fmt.Errorf("client execution failed: %w", err)
 	}
@@ -194,16 +212,16 @@ func (e *TestExecutor) executeClientServerTest(
 // executeThreeNodeTest handles the coordination between client, intermediate, and server
 func (e *TestExecutor) executeThreeNodeTest(
 	ctx context.Context,
-	r runner.Runner,
+	clientRunner, intermediateRunner, serverRunner runner.Runner,
 	clientSSH, intermediateSSH, serverSSH *ssh.Client,
 	clientConfig, intermediateConfig, serverConfig *runner.Config,
 	result *TestResult,
 	test *config.TestScenario,
 ) error {
-	// Build commands for display
-	result.ServerCommand = r.BuildCommand(*serverConfig)
-	result.ClientCommand = r.BuildCommand(*clientConfig)
-	result.IntermediateCommand = r.BuildCommand(*intermediateConfig)
+	// Build commands for display using role-specific runners
+	result.ServerCommand = serverRunner.BuildCommand(*serverConfig)
+	result.ClientCommand = clientRunner.BuildCommand(*clientConfig)
+	result.IntermediateCommand = intermediateRunner.BuildCommand(*intermediateConfig)
 	
 	// Start server first
 	e.coordinator.logger.Printf("  Starting server on %s", test.Server)
@@ -211,7 +229,7 @@ func (e *TestExecutor) executeThreeNodeTest(
 	serverErr := make(chan error, 1)
 	
 	go func() {
-		serverResult, err := e.runRemoteCommand(ctx, serverSSH, r, serverConfig)
+		serverResult, err := e.runRemoteCommand(ctx, serverSSH, serverRunner, serverConfig)
 		if err != nil {
 			serverErr <- err
 			return
@@ -228,7 +246,7 @@ func (e *TestExecutor) executeThreeNodeTest(
 	intermediateErr := make(chan error, 1)
 	
 	go func() {
-		intermediateResult, err := e.runRemoteCommand(ctx, intermediateSSH, r, intermediateConfig)
+		intermediateResult, err := e.runRemoteCommand(ctx, intermediateSSH, intermediateRunner, intermediateConfig)
 		if err != nil {
 			intermediateErr <- err
 			return
@@ -241,7 +259,7 @@ func (e *TestExecutor) executeThreeNodeTest(
 	
 	// Start client (connects to intermediate)
 	e.coordinator.logger.Printf("  Starting client on %s", test.Client)
-	clientResult, err := e.runRemoteCommand(ctx, clientSSH, r, clientConfig)
+	clientResult, err := e.runRemoteCommand(ctx, clientSSH, clientRunner, clientConfig)
 	if err != nil {
 		return fmt.Errorf("client execution failed: %w", err)
 	}

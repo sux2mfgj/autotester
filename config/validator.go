@@ -24,8 +24,9 @@ func (v *Validator) ValidateConfig(c *TestConfig) error {
 		return fmt.Errorf("test name is required")
 	}
 	
-	if c.Runner == "" {
-		return fmt.Errorf("runner is required")
+	// Validate runner configuration
+	if err := v.validateRunners(c); err != nil {
+		return err
 	}
 	
 	if len(c.Hosts) == 0 {
@@ -83,6 +84,31 @@ func (v *Validator) validateHost(name string, host *HostConfig) error {
 	if host.Role != "" && host.Role != "client" && host.Role != "server" && host.Role != "intermediate" {
 		return fmt.Errorf("host %s: invalid role %s, must be 'client', 'server', or 'intermediate'", name, host.Role)
 	}
+	
+	return nil
+}
+
+// validateRunners validates the runner configuration
+func (v *Validator) validateRunners(c *TestConfig) error {
+	// Must have either single runner or per-role runners
+	if c.Runner == "" && c.Runners == nil {
+		return fmt.Errorf("either 'runner' or 'runners' configuration is required")
+	}
+	
+	// If both are specified, warn but allow (per-role takes precedence)
+	if c.Runner != "" && c.Runners != nil {
+		// This is valid - per-role runners will take precedence
+	}
+	
+	// If using per-role runners, validate that at least one is specified
+	if c.Runners != nil {
+		if c.Runners.Client == "" && c.Runners.Server == "" && c.Runners.Intermediate == "" {
+			return fmt.Errorf("when using 'runners', at least one of client, server, or intermediate must be specified")
+		}
+	}
+	
+	// TODO: Validate that specified runners are actually registered
+	// This would require importing the runner package, which might create circular dependencies
 	
 	return nil
 }

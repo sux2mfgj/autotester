@@ -130,24 +130,53 @@ func (a *App) setupSignalHandling(cancel context.CancelFunc) {
 	}()
 }
 
-// registerRunners registers available runner implementations using auto-discovery
+// registerRunners registers all required runner implementations for mixed runner support
 func (a *App) registerRunners(coord *coordinator.Coordinator, cfg *config.TestConfig) error {
-	// Get custom binary path if configured
-	binaryPath := cfg.GetBinaryPath(cfg.Runner)
+	requiredRunners := make(map[string]bool)
 	
-	// Create runner instance from registry with custom path
-	runnerInstance, err := runner.CreateWithPath(cfg.Runner, binaryPath)
-	if err != nil {
-		availableRunners := runner.GetRegistered()
-		return fmt.Errorf("unsupported runner '%s'. Available runners: %v", cfg.Runner, availableRunners)
+	// Collect all unique runners needed across all tests and roles
+	for _, test := range cfg.Tests {
+		// Get runners for each role that might exist in the test
+		roles := []string{"client", "server"}
+		if test.Intermediate != "" {
+			roles = append(roles, "intermediate")
+		}
+		
+		for _, role := range roles {
+			runnerName := cfg.GetRunnerForRole(role)
+			if runnerName != "" {
+				requiredRunners[runnerName] = true
+			}
+		}
 	}
 	
-	if binaryPath != "" {
-		a.logger.Printf("Using custom binary path for %s: %s", cfg.Runner, binaryPath)
+	// If no runners were found via per-role configuration, fall back to single runner
+	if len(requiredRunners) == 0 && cfg.Runner != "" {
+		requiredRunners[cfg.Runner] = true
 	}
 	
-	// Register with coordinator
-	coord.RegisterRunner(cfg.Runner, runnerInstance)
+	if len(requiredRunners) == 0 {
+		return fmt.Errorf("no runners specified in configuration")
+	}
+	
+	// Register each required runner
+	for runnerName := range requiredRunners {
+		binaryPath := cfg.GetBinaryPath(runnerName)
+		
+		runnerInstance, err := runner.CreateWithPath(runnerName, binaryPath)
+		if err != nil {
+			availableRunners := runner.GetRegistered()
+			return fmt.Errorf("unsupported runner '%s'. Available runners: %v", runnerName, availableRunners)
+		}
+		
+		if binaryPath != "" {
+			a.logger.Printf("Using custom binary path for %s: %s", runnerName, binaryPath)
+		}
+		
+		// Register with coordinator
+		coord.RegisterRunner(runnerName, runnerInstance)
+		a.logger.Printf("Registered runner: %s", runnerName)
+	}
 	
 	return nil
 }
