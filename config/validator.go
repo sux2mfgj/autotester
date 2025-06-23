@@ -2,8 +2,7 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"strings"
 )
 
 // Validator handles configuration validation
@@ -174,40 +173,16 @@ func (v *Validator) validateBinaryPaths(c *TestConfig) error {
 			return fmt.Errorf("binary_paths.%s: path cannot be empty", runnerName)
 		}
 		
-		// Check if the path is absolute or check if it exists in PATH
-		if filepath.IsAbs(binaryPath) {
-			// For absolute paths, check if the file exists and is executable
-			if err := v.validateAbsoluteBinaryPath(runnerName, binaryPath); err != nil {
-				return err
-			}
-		} else {
-			// For relative paths, we'll trust that they exist in PATH
-			// (checking PATH during config validation might be too strict)
+		// Basic syntax validation only - actual binary existence will be checked on remote hosts
+		if strings.Contains(binaryPath, "\x00") {
+			return fmt.Errorf("binary_paths.%s: path contains null byte", runnerName)
 		}
-	}
-	
-	return nil
-}
-
-// validateAbsoluteBinaryPath validates an absolute binary path
-func (v *Validator) validateAbsoluteBinaryPath(runnerName, binaryPath string) error {
-	// Check if file exists
-	info, err := os.Stat(binaryPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("binary_paths.%s: file does not exist: %s", runnerName, binaryPath)
-		}
-		return fmt.Errorf("binary_paths.%s: cannot access file %s: %v", runnerName, binaryPath, err)
-	}
-	
-	// Check if it's a regular file
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf("binary_paths.%s: %s is not a regular file", runnerName, binaryPath)
-	}
-	
-	// Check if it's executable (on Unix-like systems)
-	if info.Mode().Perm()&0111 == 0 {
-		return fmt.Errorf("binary_paths.%s: %s is not executable", runnerName, binaryPath)
+		
+		// Note: We do NOT validate binary existence here because:
+		// 1. Binaries need to exist on REMOTE hosts, not local
+		// 2. Remote validation requires SSH connections
+		// 3. This would slow down config loading significantly
+		// Actual binary validation happens during test execution with clear error messages
 	}
 	
 	return nil

@@ -1,0 +1,42 @@
+name: "Remote Binary Validation Test"
+description: "Test remote binary validation with localhost"
+
+runners:
+  client: "iperf3"
+  server: "iperf3"  
+  intermediate: "testpmd"
+
+# No custom binary paths - test default discovery
+# binary_paths:
+#   iperf3: "/usr/bin/iperf3"
+#   testpmd: "/usr/local/bin/dpdk-testpmd"
+
+hosts:
+  test_client:
+    ssh:
+      host: "127.0.0.1"
+      user: $USER
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+    
+  test_intermediate:  
+    ssh:
+      host: "127.0.0.1"
+      user: $USER
+      key_path: "~/.ssh/id_rsa"
+    role: "intermediate"
+    
+  test_server:
+    ssh:
+      host: "127.0.0.1" 
+      user: $USER
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+
+tests:
+  - name: "Binary Validation Test"
+    client: "test_client"
+    server: "test_server"
+    intermediate: "test_intermediate"
+    config:
+      duration: 5s

@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"perf-runner/config"
@@ -121,6 +122,11 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 		if clientConfig.TargetHost == "" {
 			clientConfig.TargetHost = serverHost.SSH.Host
 		}
+	}
+	
+	// Validate binary paths on remote hosts
+	if err := e.validateRemoteBinaries(ctx, test, clientSSH, serverSSH, intermediateSSH, clientRunner, serverRunner, intermediateRunner); err != nil {
+		return nil, fmt.Errorf("binary validation failed: %w", err)
 	}
 	
 	// Create context with timeout
@@ -367,6 +373,92 @@ func (e *TestExecutor) collectEnvironmentInfo(ctx context.Context, result *TestR
 		} else {
 			result.EnvironmentInfo.IntermediateEnv = envInfo
 			e.coordinator.logger.Printf("  Collected intermediate environment from %s", test.Intermediate)
+		}
+	}
+	
+	return nil
+}
+
+// validateRemoteBinaries validates that required binaries exist on remote hosts
+func (e *TestExecutor) validateRemoteBinaries(ctx context.Context, test *config.TestScenario, clientSSH, serverSSH, intermediateSSH *ssh.Client, clientRunner, serverRunner, intermediateRunner runner.Runner) error {
+	// Collect binary validation tasks
+	type validationTask struct {
+		hostName     string
+		sshClient    *ssh.Client
+		runnerName   string
+		runner       runner.Runner
+		role         string
+	}
+	
+	var tasks []validationTask
+	
+	// Add client validation
+	if clientSSH != nil && clientRunner != nil {
+		clientRunnerName := e.coordinator.config.GetRunnerForRole("client")
+		tasks = append(tasks, validationTask{
+			hostName:   test.Client,
+			sshClient:  clientSSH,
+			runnerName: clientRunnerName,
+			runner:     clientRunner,
+			role:       "client",
+		})
+	}
+	
+	// Add server validation
+	if serverSSH != nil && serverRunner != nil {
+		serverRunnerName := e.coordinator.config.GetRunnerForRole("server")
+		tasks = append(tasks, validationTask{
+			hostName:   test.Server,
+			sshClient:  serverSSH,
+			runnerName: serverRunnerName,
+			runner:     serverRunner,
+			role:       "server",
+		})
+	}
+	
+	// Add intermediate validation if present
+	if intermediateSSH != nil && intermediateRunner != nil {
+		intermediateRunnerName := e.coordinator.config.GetRunnerForRole("intermediate")
+		tasks = append(tasks, validationTask{
+			hostName:   test.Intermediate,
+			sshClient:  intermediateSSH,
+			runnerName: intermediateRunnerName,
+			runner:     intermediateRunner,
+			role:       "intermediate",
+		})
+	}
+	
+	// Validate binaries on each host
+	for _, task := range tasks {
+		binaryPath := e.coordinator.config.GetBinaryPath(task.runnerName)
+		if binaryPath == "" {
+			// No custom binary path specified, assume default binary name
+			binaryPath = task.runnerName
+		}
+		
+		e.coordinator.logger.Printf("  Validating %s binary '%s' on host %s", task.role, binaryPath, task.hostName)
+		
+		// Check if binary exists and is executable
+		checkCmd := fmt.Sprintf("command -v %s >/dev/null 2>&1 && test -x $(command -v %s)", binaryPath, binaryPath)
+		result, err := task.sshClient.ExecuteCommand(ctx, checkCmd)
+		if err != nil {
+			return fmt.Errorf("failed to check binary '%s' on %s host %s: %w", binaryPath, task.role, task.hostName, err)
+		}
+		if result.ExitCode != 0 {
+			return fmt.Errorf("binary '%s' not found or not executable on %s host %s", binaryPath, task.role, task.hostName)
+		}
+		
+		// Get binary version for logging
+		versionCmd := fmt.Sprintf("%s --version 2>/dev/null | head -1 || echo 'Version unknown'", binaryPath)
+		if versionResult, err := task.sshClient.ExecuteCommand(ctx, versionCmd); err == nil && versionResult.ExitCode == 0 {
+			version := strings.TrimSpace(versionResult.Output)
+			if version != "" && version != "Version unknown" {
+				e.coordinator.logger.Printf("    Found %s: %s", binaryPath, version)
+			} else {
+				e.coordinator.logger.Printf("    Found %s (version detection failed)", binaryPath)
+			}
+		} else {
+			e.coordinator.logger.Printf("    Found %s (version unknown)", binaryPath)
 		}
 	}
 	
