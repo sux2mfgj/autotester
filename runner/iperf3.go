@@ -82,6 +82,9 @@ func (r *Iperf3Runner) Validate(config Config) error {
 
 // BuildCommand constructs the full command line for remote execution
 func (r *Iperf3Runner) BuildCommand(config Config) string {
+	// Build environment variable prefix
+	envPrefix := buildEnvPrefix(config)
+	
 	cmd := r.executablePath
 	
 	// Set role (server, client, or intermediate)
@@ -115,7 +118,7 @@ func (r *Iperf3Runner) BuildCommand(config Config) string {
 		cmd += fmt.Sprintf(" TCP-LISTEN:%d,fork TCP:%s:%d", listenPort, targetHost, targetPort)
 		
 		// Return early for socat command
-		return cmd
+		return envPrefix + cmd
 	}
 	
 	// Port (if specified)
@@ -184,8 +187,8 @@ func (r *Iperf3Runner) BuildCommand(config Config) string {
 			}
 		}
 	}
-	
-	return cmd
+
+	return envPrefix + cmd
 }
 
 // ParseMetrics extracts performance metrics from iperf3 JSON output

@@ -13,6 +13,11 @@ hosts:
       connect_timeout: 30s
       command_timeout: 600s
     role: "server"
+    # Environment variables for InfiniBand performance
+    env:
+      LD_LIBRARY_PATH: "/opt/mellanox/lib:/usr/local/lib"
+      MLNX_OFED_DEBUG: "0"
+      MLX5_SCATTER_TO_CQE: "1"
     runner:
       port: 18515  # Default ib_send_bw port
       args:
@@ -32,6 +37,11 @@ hosts:
       connect_timeout: 30s
       command_timeout: 600s
     role: "client"
+    # Client-specific environment variables
+    env:
+      LD_LIBRARY_PATH: "/opt/mellanox/lib:/usr/local/lib"
+      UCX_NET_DEVICES: "mlx5_0:1"
+      UCX_TLS: "rc_x,ud_x,self"
     runner:
       port: 18515
       target_host: "10.0.0.100"  # InfiniBand network IP (different from SSH host)
@@ -160,6 +170,12 @@ tests:
     server: "ib_server"
     config:
       duration: 300s   # 5 minutes
+      # Test-specific environment variables override host-level ones
+      env:
+        LD_LIBRARY_PATH: "/opt/mellanox/lib/performance:/opt/mellanox/lib"
+        MLX5_SINGLE_THREADED: "1"
+        MLX5_SCATTER_TO_CQE: "0"
+        RDMA_CORE_DEBUG: "0"
       args:
         size: 131072     # 128KB messages
         iterations: 50000

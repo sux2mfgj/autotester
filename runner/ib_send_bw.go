@@ -70,6 +70,9 @@ func (r *IbSendBwRunner) Validate(config Config) error {
 
 // BuildCommand constructs the full command line for remote execution
 func (r *IbSendBwRunner) BuildCommand(config Config) string {
+	// Build environment variable prefix
+	envPrefix := buildEnvPrefix(config)
+	
 	cmd := r.executablePath
 	
 	// Handle different roles
@@ -205,8 +208,8 @@ func (r *IbSendBwRunner) BuildCommand(config Config) string {
 			}
 		}
 	}
-	
-	return cmd
+
+	return envPrefix + cmd
 }
 
 

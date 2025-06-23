@@ -2,6 +2,8 @@ package runner
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -108,4 +110,31 @@ func GetRegistered() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+// buildEnvPrefix creates a shell environment variable prefix from the config's Env map
+// Returns a string like "VAR1=value1 VAR2=value2 " (with trailing space) or empty string if no env vars
+func buildEnvPrefix(config Config) string {
+	if len(config.Env) == 0 {
+		return ""
+	}
+
+	// Sort keys for consistent output
+	keys := make([]string, 0, len(config.Env))
+	for k := range config.Env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var envParts []string
+	for _, key := range keys {
+		value := config.Env[key]
+		// Basic shell escaping for values containing spaces or special characters
+		if strings.ContainsAny(value, " \t\n\"'$`\\") {
+			value = fmt.Sprintf("'%s'", strings.ReplaceAll(value, "'", "'\"'\"'"))
+		}
+		envParts = append(envParts, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	return strings.Join(envParts, " ") + " "
 }

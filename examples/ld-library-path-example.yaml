@@ -1,0 +1,60 @@
+name: "LD_LIBRARY_PATH Environment Variable Example"
+runner: "iperf3"
+collect_env: true
+
+# Optional: specify custom paths for test binaries
+binary_paths:
+  iperf3: "/usr/local/bin/iperf3"
+
+hosts:
+  server_host:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    # Environment variables applied to all tests on this host
+    env:
+      LD_LIBRARY_PATH: "/usr/local/lib/custom:/opt/intel/oneapi/mkl/latest/lib"
+      RDMA_DEBUG: "1"
+      
+  client_host:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+    # Different library path for client
+    env:
+      LD_LIBRARY_PATH: "/usr/local/lib/custom:/opt/mellanox/lib"
+      NUMA_POLICY: "preferred"
+
+tests:
+  - name: "Basic bandwidth test with custom libraries"
+    client: "client_host"
+    server: "server_host"
+    config:
+      duration: 30s
+      args:
+        parallel_streams: 4
+        protocol: "tcp"
+        bitrate: "10G"
+      # Test-specific environment variables override host-level ones
+      env:
+        LD_LIBRARY_PATH: "/usr/local/lib/test:/usr/local/lib/custom"
+        MALLOC_ARENA_MAX: "4"
+        
+  - name: "UDP test with RDMA libraries"
+    client: "client_host"
+    server: "server_host"  
+    config:
+      duration: 15s
+      args:
+        protocol: "udp"
+        bitrate: "1G"
+        buffer_length: "128K"
+      # Additional environment for UDP testing
+      env:
+        LD_LIBRARY_PATH: "/opt/rdma/lib:/usr/local/lib"
+        UCX_NET_DEVICES: "mlx5_0:1"
+        UCX_TLS: "rc_x,ud_x"
