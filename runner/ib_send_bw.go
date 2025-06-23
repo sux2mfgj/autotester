@@ -111,8 +111,9 @@ func (r *IbSendBwRunner) BuildCommand(config Config) string {
 		cmd += fmt.Sprintf(" -D %d", int(config.Duration.Seconds()))
 	}
 	
-	// Additional arguments from config
-	for key, value := range config.Args {
+	// Additional arguments from config (use effective args based on role)
+	effectiveArgs := config.GetEffectiveArgs()
+	for key, value := range effectiveArgs {
 		switch key {
 		case "size":
 			// Message size in bytes

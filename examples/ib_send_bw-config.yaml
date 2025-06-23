@@ -187,3 +187,35 @@ tests:
         report_gbits: true  # Report in Gb/sec
     repeat: 3
     delay: 10s
+    
+  - name: "IB Send BW - Role-Specific Configuration"
+    description: "Server and client with different queue depths and settings"
+    client: "ib_client"
+    server: "ib_server"
+    config:
+      duration: 60s
+      # Common arguments for both server and client
+      args:
+        size: 32768      # 32KB messages
+        iterations: 10000
+        connection: "RC"
+        ib_dev: "mlx5_0"
+        gid_index: 3
+      # Server-specific arguments - optimized for receiving
+      server_args:
+        rx_depth: 512    # Large receive queue
+        tx_depth: 64     # Small transmit queue
+        use_event: false # Use polling for low latency
+      # Client-specific arguments - optimized for sending  
+      client_args:
+        tx_depth: 512    # Large transmit queue
+        rx_depth: 64     # Small receive queue
+        inline: 128     # More inline data
+        report_cycles: true
+      # Role-specific environment variables
+      server_env:
+        MLX5_SINGLE_THREADED: "1"
+        MLX5_SCATTER_TO_CQE: "0"
+      client_env:
+        MLX5_SINGLE_THREADED: "0" 
+        RDMA_CORE_DEBUG: "0"

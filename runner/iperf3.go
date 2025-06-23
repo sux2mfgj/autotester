@@ -63,8 +63,9 @@ func (r *Iperf3Runner) Validate(config Config) error {
 		}
 	}
 	
-	// Validate parallel streams if specified
-	if parallelStreams, exists := config.Args["parallel_streams"]; exists {
+	// Validate parallel streams if specified (use effective args)
+	effectiveArgs := config.GetEffectiveArgs()
+	if parallelStreams, exists := effectiveArgs["parallel_streams"]; exists {
 		if streams, ok := parallelStreams.(int); ok {
 			if streams <= 0 {
 				return fmt.Errorf("parallel_streams must be greater than 0")
@@ -134,8 +135,9 @@ func (r *Iperf3Runner) BuildCommand(config Config) string {
 	// Always request JSON output for easier parsing
 	cmd += " -J"
 	
-	// Additional arguments from config
-	for key, value := range config.Args {
+	// Additional arguments from config (use effective args based on role)
+	effectiveArgs := config.GetEffectiveArgs()
+	for key, value := range effectiveArgs {
 		switch key {
 		case "parallel_streams":
 			if streams, ok := value.(int); ok && streams > 0 {

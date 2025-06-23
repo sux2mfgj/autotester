@@ -106,8 +106,12 @@ func (c *TestConfig) HasIntermediateNode(test *TestScenario) bool {
 func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *runner.Config) *runner.Config {
 	if hostConfig == nil && testConfig == nil {
 		return &runner.Config{
-			Args: make(map[string]interface{}),
-			Env:  make(map[string]string),
+			Args:       make(map[string]interface{}),
+			Env:        make(map[string]string),
+			ServerArgs: make(map[string]interface{}),
+			ClientArgs: make(map[string]interface{}),
+			ServerEnv:  make(map[string]string),
+			ClientEnv:  make(map[string]string),
 		}
 	}
 	
@@ -118,6 +122,18 @@ func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *ru
 		}
 		if result.Env == nil {
 			result.Env = make(map[string]string)
+		}
+		if result.ServerArgs == nil {
+			result.ServerArgs = make(map[string]interface{})
+		}
+		if result.ClientArgs == nil {
+			result.ClientArgs = make(map[string]interface{})
+		}
+		if result.ServerEnv == nil {
+			result.ServerEnv = make(map[string]string)
+		}
+		if result.ClientEnv == nil {
+			result.ClientEnv = make(map[string]string)
 		}
 		return &result
 	}
@@ -130,6 +146,18 @@ func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *ru
 		if result.Env == nil {
 			result.Env = make(map[string]string)
 		}
+		if result.ServerArgs == nil {
+			result.ServerArgs = make(map[string]interface{})
+		}
+		if result.ClientArgs == nil {
+			result.ClientArgs = make(map[string]interface{})
+		}
+		if result.ServerEnv == nil {
+			result.ServerEnv = make(map[string]string)
+		}
+		if result.ClientEnv == nil {
+			result.ClientEnv = make(map[string]string)
+		}
 		return &result
 	}
 	
@@ -138,6 +166,10 @@ func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *ru
 		Duration:   hostConfig.Duration,
 		Args:       make(map[string]interface{}),
 		Env:        make(map[string]string),
+		ServerArgs: make(map[string]interface{}),
+		ClientArgs: make(map[string]interface{}),
+		ServerEnv:  make(map[string]string),
+		ClientEnv:  make(map[string]string),
 		Role:       hostConfig.Role,
 		Host:       hostConfig.Host,
 		TargetHost: hostConfig.TargetHost,
@@ -150,6 +182,18 @@ func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *ru
 	}
 	for k, v := range hostConfig.Env {
 		merged.Env[k] = v
+	}
+	for k, v := range hostConfig.ServerArgs {
+		merged.ServerArgs[k] = v
+	}
+	for k, v := range hostConfig.ClientArgs {
+		merged.ClientArgs[k] = v
+	}
+	for k, v := range hostConfig.ServerEnv {
+		merged.ServerEnv[k] = v
+	}
+	for k, v := range hostConfig.ClientEnv {
+		merged.ClientEnv[k] = v
 	}
 	
 	// Override with test config
@@ -174,6 +218,18 @@ func (c *TestConfig) MergeRunnerConfig(hostConfig *runner.Config, testConfig *ru
 	}
 	for k, v := range testConfig.Env {
 		merged.Env[k] = v
+	}
+	for k, v := range testConfig.ServerArgs {
+		merged.ServerArgs[k] = v
+	}
+	for k, v := range testConfig.ClientArgs {
+		merged.ClientArgs[k] = v
+	}
+	for k, v := range testConfig.ServerEnv {
+		merged.ServerEnv[k] = v
+	}
+	for k, v := range testConfig.ClientEnv {
+		merged.ClientEnv[k] = v
 	}
 	
 	return merged

@@ -1,0 +1,107 @@
+name: "Role-Specific Arguments Example"
+description: "Demonstrates separate server and client arguments in test configurations"
+runner: "iperf3"
+timeout: 5m
+
+hosts:
+  server_host:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    # Host-level common arguments for all tests
+    runner:
+      port: 5201
+      args:
+        # These args apply to both server and client unless overridden
+        verbose: true
+
+  client_host:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+    runner:
+      port: 5201
+
+tests:
+  - name: "Basic Test with Role-Specific Args"
+    description: "Server runs with different settings than client"
+    client: "client_host"
+    server: "server_host"
+    config:
+      duration: 30s
+      # General args apply to both unless overridden by role-specific args
+      args:
+        protocol: "tcp"
+        interval: 1
+      # Server-specific arguments
+      server_args:
+        bind_address: "0.0.0.0"  # Server binds to all interfaces
+        window_size: "2M"        # Larger receive window
+      # Client-specific arguments  
+      client_args:
+        parallel_streams: 4      # Client uses multiple streams
+        window_size: "128K"      # Smaller send window
+        bitrate: "1G"           # Target 1 Gbps
+        
+  - name: "UDP Test with Different Packet Sizes"
+    description: "UDP test with server and client using different buffer sizes"
+    client: "client_host"
+    server: "server_host" 
+    config:
+      duration: 20s
+      args:
+        protocol: "udp"
+        interval: 2
+      server_args:
+        buffer_length: "1M"      # Server uses 1MB buffer
+        bind_address: "0.0.0.0"
+      client_args:
+        buffer_length: "64K"     # Client uses 64KB buffer
+        bitrate: "100M"          # UDP rate limit
+        parallel_streams: 2
+        
+  - name: "Role-Specific Environment Variables"
+    description: "Different environment settings for server vs client"
+    client: "client_host"
+    server: "server_host"
+    config:
+      duration: 15s
+      # Common environment variables
+      env:
+        LANG: "en_US.UTF-8"
+      # Server-specific environment
+      server_env:
+        IPERF3_SERVER_DEBUG: "1"
+        TCP_NODELAY: "1"
+      # Client-specific environment  
+      client_env:
+        IPERF3_CLIENT_DEBUG: "1"
+        TCP_CONGESTION: "cubic"
+      args:
+        protocol: "tcp"
+        parallel_streams: 1
+        
+  - name: "Mixed General and Role-Specific Args"
+    description: "Combination of general args with role-specific overrides"
+    client: "client_host" 
+    server: "server_host"
+    config:
+      duration: 45s
+      # These apply to both server and client
+      args:
+        protocol: "tcp"
+        interval: 5
+        verbose: true
+        window_size: "256K"      # Default for both
+      # Client overrides the window size and adds specific settings
+      client_args:
+        window_size: "1M"        # Override: larger client window
+        parallel_streams: 8      # Client-only: multiple streams
+        omit_seconds: 5          # Client-only: omit first 5 seconds
+      # Server keeps default window_size but adds bind setting  
+      server_args:
+        bind_address: "0.0.0.0"  # Server-only: bind to all interfaces

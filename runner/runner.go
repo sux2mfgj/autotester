@@ -15,6 +15,14 @@ type Config struct {
 	Args     map[string]interface{}   `yaml:"args"`
 	Env      map[string]string        `yaml:"env"`
 	
+	// Role-specific arguments (takes precedence over Args when specified)
+	ServerArgs map[string]interface{} `yaml:"server_args,omitempty"`
+	ClientArgs map[string]interface{} `yaml:"client_args,omitempty"`
+	
+	// Role-specific environment variables (takes precedence over Env when specified)
+	ServerEnv  map[string]string      `yaml:"server_env,omitempty"`
+	ClientEnv  map[string]string      `yaml:"client_env,omitempty"`
+	
 	// Role-specific settings
 	Role     string                   `yaml:"role"` // "client" or "server"
 	
@@ -112,23 +120,25 @@ func GetRegistered() []string {
 	return names
 }
 
-// buildEnvPrefix creates a shell environment variable prefix from the config's Env map
+// buildEnvPrefix creates a shell environment variable prefix from the config's effective Env map
 // Returns a string like "VAR1=value1 VAR2=value2 " (with trailing space) or empty string if no env vars
 func buildEnvPrefix(config Config) string {
-	if len(config.Env) == 0 {
+	effectiveEnv := config.GetEffectiveEnv()
+	
+	if len(effectiveEnv) == 0 {
 		return ""
 	}
 
 	// Sort keys for consistent output
-	keys := make([]string, 0, len(config.Env))
-	for k := range config.Env {
+	keys := make([]string, 0, len(effectiveEnv))
+	for k := range effectiveEnv {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
 	var envParts []string
 	for _, key := range keys {
-		value := config.Env[key]
+		value := effectiveEnv[key]
 		// Basic shell escaping for values containing spaces or special characters
 		if strings.ContainsAny(value, " \t\n\"'$`\\") {
 			value = fmt.Sprintf("'%s'", strings.ReplaceAll(value, "'", "'\"'\"'"))
@@ -137,4 +147,54 @@ func buildEnvPrefix(config Config) string {
 	}
 
 	return strings.Join(envParts, " ") + " "
+}
+
+// GetEffectiveArgs returns the effective arguments for the given role
+// Role-specific args (ServerArgs/ClientArgs) take precedence over general Args
+func (c *Config) GetEffectiveArgs() map[string]interface{} {
+	// Start with general args
+	effective := make(map[string]interface{})
+	for k, v := range c.Args {
+		effective[k] = v
+	}
+	
+	// Override with role-specific args
+	var roleArgs map[string]interface{}
+	switch c.Role {
+	case "server":
+		roleArgs = c.ServerArgs
+	case "client":
+		roleArgs = c.ClientArgs
+	}
+	
+	for k, v := range roleArgs {
+		effective[k] = v
+	}
+	
+	return effective
+}
+
+// GetEffectiveEnv returns the effective environment variables for the given role
+// Role-specific env (ServerEnv/ClientEnv) take precedence over general Env
+func (c *Config) GetEffectiveEnv() map[string]string {
+	// Start with general env
+	effective := make(map[string]string)
+	for k, v := range c.Env {
+		effective[k] = v
+	}
+	
+	// Override with role-specific env
+	var roleEnv map[string]string
+	switch c.Role {
+	case "server":
+		roleEnv = c.ServerEnv
+	case "client":
+		roleEnv = c.ClientEnv
+	}
+	
+	for k, v := range roleEnv {
+		effective[k] = v
+	}
+	
+	return effective
 }
