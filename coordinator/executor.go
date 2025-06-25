@@ -46,7 +46,22 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	}
 	
 	var intermediateRunner runner.Runner
-	if e.coordinator.config.HasIntermediateNode(test) {
+	var intermediate1Runner, intermediate2Runner runner.Runner
+	
+	if e.coordinator.config.HasFourNodeTopology(test) {
+		// 4-node topology: need two intermediate runners
+		intermediateRunnerName := e.coordinator.config.GetRunnerForRole("intermediate")
+		var exists bool
+		intermediate1Runner, exists = e.coordinator.runners[intermediateRunnerName]
+		if !exists {
+			return nil, fmt.Errorf("intermediate1 runner %s not found", intermediateRunnerName)
+		}
+		intermediate2Runner, exists = e.coordinator.runners[intermediateRunnerName]
+		if !exists {
+			return nil, fmt.Errorf("intermediate2 runner %s not found", intermediateRunnerName)
+		}
+	} else if e.coordinator.config.HasIntermediateNode(test) {
+		// 3-node topology: single intermediate runner
 		intermediateRunnerName := e.coordinator.config.GetRunnerForRole("intermediate")
 		var exists bool
 		intermediateRunner, exists = e.coordinator.runners[intermediateRunnerName]
@@ -59,6 +74,8 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	clientHost := e.coordinator.config.GetClientHost(test)
 	serverHost := e.coordinator.config.GetServerHost(test)
 	intermediateHost := e.coordinator.config.GetIntermediateHost(test)
+	intermediate1Host := e.coordinator.config.GetIntermediate1Host(test)
+	intermediate2Host := e.coordinator.config.GetIntermediate2Host(test)
 	
 	if clientHost == nil {
 		return nil, fmt.Errorf("client host %s not found", test.Client)
@@ -70,7 +87,7 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	// Get SSH clients
 	clientSSH := e.coordinator.sshClients[test.Client]
 	serverSSH := e.coordinator.sshClients[test.Server]
-	var intermediateSSH *ssh.Client
+	var intermediateSSH, intermediate1SSH, intermediate2SSH *ssh.Client
 	
 	if clientSSH == nil {
 		return nil, fmt.Errorf("SSH client for host %s not connected", test.Client)
@@ -79,8 +96,25 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 		return nil, fmt.Errorf("SSH client for host %s not connected", test.Server)
 	}
 	
-	// Check intermediate node if specified
-	if e.coordinator.config.HasIntermediateNode(test) {
+	// Check intermediate nodes based on topology
+	if e.coordinator.config.HasFourNodeTopology(test) {
+		// 4-node topology: validate both intermediate hosts
+		if intermediate1Host == nil {
+			return nil, fmt.Errorf("intermediate1 host %s not found", test.Intermediate1)
+		}
+		if intermediate2Host == nil {
+			return nil, fmt.Errorf("intermediate2 host %s not found", test.Intermediate2)
+		}
+		intermediate1SSH = e.coordinator.sshClients[test.Intermediate1]
+		intermediate2SSH = e.coordinator.sshClients[test.Intermediate2]
+		if intermediate1SSH == nil {
+			return nil, fmt.Errorf("SSH client for intermediate1 host %s not connected", test.Intermediate1)
+		}
+		if intermediate2SSH == nil {
+			return nil, fmt.Errorf("SSH client for intermediate2 host %s not connected", test.Intermediate2)
+		}
+	} else if e.coordinator.config.HasIntermediateNode(test) {
+		// 3-node topology: validate single intermediate host
 		if intermediateHost == nil {
 			return nil, fmt.Errorf("intermediate host %s not found", test.Intermediate)
 		}
@@ -97,10 +131,35 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	clientConfig := e.coordinator.config.MergeRunnerConfig(clientHost.Runner, test.Config)
 	clientConfig.Role = "client"
 	
-	var intermediateConfig *runner.Config
+	var intermediateConfig, intermediate1Config, intermediate2Config *runner.Config
 	
-	// Configure connection topology based on intermediate node presence
-	if e.coordinator.config.HasIntermediateNode(test) {
+	// Configure connection topology based on node count
+	if e.coordinator.config.HasFourNodeTopology(test) {
+		// 4-node topology: Client → Intermediate1 → Intermediate2 → Server
+		intermediate1Config = e.coordinator.config.MergeRunnerConfig(intermediate1Host.Runner, test.Config)
+		intermediate1Config.Role = "intermediate"
+		
+		intermediate2Config = e.coordinator.config.MergeRunnerConfig(intermediate2Host.Runner, test.Config)
+		intermediate2Config.Role = "intermediate"
+		
+		// Intermediate2 connects to server
+		intermediate2Config.Host = serverHost.SSH.Host
+		if intermediate2Config.TargetHost == "" {
+			intermediate2Config.TargetHost = serverHost.SSH.Host
+		}
+		
+		// Intermediate1 connects to intermediate2
+		intermediate1Config.Host = intermediate2Host.SSH.Host
+		if intermediate1Config.TargetHost == "" {
+			intermediate1Config.TargetHost = intermediate2Host.SSH.Host
+		}
+		
+		// Client connects to intermediate1
+		clientConfig.Host = intermediate1Host.SSH.Host
+		if clientConfig.TargetHost == "" {
+			clientConfig.TargetHost = intermediate1Host.SSH.Host
+		}
+	} else if e.coordinator.config.HasIntermediateNode(test) {
 		// 3-node topology: Client → Intermediate → Server
 		intermediateConfig = e.coordinator.config.MergeRunnerConfig(intermediateHost.Runner, test.Config)
 		intermediateConfig.Role = "intermediate"
@@ -134,7 +193,12 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	defer cancel()
 	
 	// Execute the test based on topology
-	if e.coordinator.config.HasIntermediateNode(test) {
+	if e.coordinator.config.HasFourNodeTopology(test) {
+		// 4-node topology: Client → Intermediate1 → Intermediate2 → Server
+		if err := e.executeFourNodeTest(testCtx, clientRunner, intermediate1Runner, intermediate2Runner, serverRunner, clientSSH, intermediate1SSH, intermediate2SSH, serverSSH, clientConfig, intermediate1Config, intermediate2Config, serverConfig, result, test); err != nil {
+			return nil, err
+		}
+	} else if e.coordinator.config.HasIntermediateNode(test) {
 		// 3-node topology
 		if err := e.executeThreeNodeTest(testCtx, clientRunner, intermediateRunner, serverRunner, clientSSH, intermediateSSH, serverSSH, clientConfig, intermediateConfig, serverConfig, result, test); err != nil {
 			return nil, err
@@ -158,6 +222,8 @@ func (e *TestExecutor) ExecuteTest(ctx context.Context, test *config.TestScenari
 	result.Success = result.ClientResult != nil && result.ClientResult.Success && 
 		(result.ServerResult == nil || result.ServerResult.Success) &&
 		(result.IntermediateResult == nil || result.IntermediateResult.Success) &&
+		(result.Intermediate1Result == nil || result.Intermediate1Result.Success) &&
+		(result.Intermediate2Result == nil || result.Intermediate2Result.Success) &&
 		result.Error == ""
 	
 	return result, nil
@@ -293,6 +359,120 @@ func (e *TestExecutor) executeThreeNodeTest(
 	case <-time.After(5 * time.Second):
 		// Give intermediate a bit more time to clean up
 		e.coordinator.logger.Printf("  Warning: intermediate node did not complete within timeout")
+	}
+	
+	return nil
+}
+
+// executeFourNodeTest handles the coordination between client, two intermediate nodes, and server
+func (e *TestExecutor) executeFourNodeTest(
+	ctx context.Context,
+	clientRunner, intermediate1Runner, intermediate2Runner, serverRunner runner.Runner,
+	clientSSH, intermediate1SSH, intermediate2SSH, serverSSH *ssh.Client,
+	clientConfig, intermediate1Config, intermediate2Config, serverConfig *runner.Config,
+	result *TestResult,
+	test *config.TestScenario,
+) error {
+	// Build commands for display using role-specific runners
+	result.ServerCommand = serverRunner.BuildCommand(*serverConfig)
+	result.ClientCommand = clientRunner.BuildCommand(*clientConfig)
+	result.Intermediate1Command = intermediate1Runner.BuildCommand(*intermediate1Config)
+	result.Intermediate2Command = intermediate2Runner.BuildCommand(*intermediate2Config)
+	
+	// Start server first
+	e.coordinator.logger.Printf("  Starting server on %s", test.Server)
+	serverDone := make(chan *runner.Result, 1)
+	serverErr := make(chan error, 1)
+	
+	go func() {
+		serverResult, err := e.runRemoteCommand(ctx, serverSSH, serverRunner, serverConfig)
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		serverDone <- serverResult
+	}()
+	
+	// Wait for server to start
+	time.Sleep(2 * time.Second)
+	
+	// Start intermediate2 node (closest to server)
+	e.coordinator.logger.Printf("  Starting intermediate2 node on %s", test.Intermediate2)
+	intermediate2Done := make(chan *runner.Result, 1)
+	intermediate2Err := make(chan error, 1)
+	
+	go func() {
+		intermediate2Result, err := e.runRemoteCommand(ctx, intermediate2SSH, intermediate2Runner, intermediate2Config)
+		if err != nil {
+			intermediate2Err <- err
+			return
+		}
+		intermediate2Done <- intermediate2Result
+	}()
+	
+	// Wait for intermediate2 to establish connection to server
+	time.Sleep(2 * time.Second)
+	
+	// Start intermediate1 node (connects to intermediate2)
+	e.coordinator.logger.Printf("  Starting intermediate1 node on %s", test.Intermediate1)
+	intermediate1Done := make(chan *runner.Result, 1)
+	intermediate1Err := make(chan error, 1)
+	
+	go func() {
+		intermediate1Result, err := e.runRemoteCommand(ctx, intermediate1SSH, intermediate1Runner, intermediate1Config)
+		if err != nil {
+			intermediate1Err <- err
+			return
+		}
+		intermediate1Done <- intermediate1Result
+	}()
+	
+	// Wait for intermediate1 to establish connection to intermediate2
+	time.Sleep(2 * time.Second)
+	
+	// Start client (connects to intermediate1)
+	e.coordinator.logger.Printf("  Starting client on %s", test.Client)
+	clientResult, err := e.runRemoteCommand(ctx, clientSSH, clientRunner, clientConfig)
+	if err != nil {
+		return fmt.Errorf("client execution failed: %w", err)
+	}
+	
+	result.ClientResult = clientResult
+	
+	// Wait for server to complete or timeout
+	select {
+	case serverResult := <-serverDone:
+		result.ServerResult = serverResult
+	case err := <-serverErr:
+		result.Error = fmt.Sprintf("server execution failed: %v", err)
+	case <-ctx.Done():
+		result.Error = "test timed out"
+	}
+	
+	// Collect intermediate1 result
+	select {
+	case intermediate1Result := <-intermediate1Done:
+		result.Intermediate1Result = intermediate1Result
+	case err := <-intermediate1Err:
+		if result.Error == "" {
+			result.Error = fmt.Sprintf("intermediate1 execution failed: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		// Give intermediate1 a bit more time to clean up
+		e.coordinator.logger.Printf("  Warning: intermediate1 node did not complete within timeout")
+	}
+	
+	// Collect intermediate2 result  
+	select {
+	case intermediate2Result := <-intermediate2Done:
+		result.Intermediate2Result = intermediate2Result
+	case err := <-intermediate2Err:
+		if result.Error == "" {
+			result.Error = fmt.Sprintf("intermediate2 execution failed: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		// Give intermediate2 a bit more time to clean up
+		e.coordinator.logger.Printf("  Warning: intermediate2 node did not complete within timeout")
 	}
 	
 	return nil

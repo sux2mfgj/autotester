@@ -53,6 +53,12 @@ func (f *Formatter) outputJSON(results []*coordinator.TestResult, totalDuration 
 		if result.IntermediateCommand != "" {
 			enhancedResult["intermediate_command"] = result.IntermediateCommand
 		}
+		if result.Intermediate1Command != "" {
+			enhancedResult["intermediate1_command"] = result.Intermediate1Command
+		}
+		if result.Intermediate2Command != "" {
+			enhancedResult["intermediate2_command"] = result.Intermediate2Command
+		}
 		
 		if result.Error != "" {
 			enhancedResult["error"] = result.Error
@@ -116,6 +122,46 @@ func (f *Formatter) outputJSON(results []*coordinator.TestResult, totalDuration 
 			}
 			
 			enhancedResult["intermediate_result"] = intermediateInfo
+		}
+		
+		if result.Intermediate1Result != nil {
+			intermediate1Info := map[string]interface{}{
+				"success":   result.Intermediate1Result.Success,
+				"duration":  result.Intermediate1Result.Duration,
+				"exit_code": result.Intermediate1Result.ExitCode,
+			}
+			
+			if result.Intermediate1Result.Output != "" {
+				intermediate1Info["output"] = result.Intermediate1Result.Output
+			}
+			if result.Intermediate1Result.Error != "" {
+				intermediate1Info["error"] = result.Intermediate1Result.Error
+			}
+			if len(result.Intermediate1Result.Metrics) > 0 {
+				intermediate1Info["metrics"] = result.Intermediate1Result.Metrics
+			}
+			
+			enhancedResult["intermediate1_result"] = intermediate1Info
+		}
+		
+		if result.Intermediate2Result != nil {
+			intermediate2Info := map[string]interface{}{
+				"success":   result.Intermediate2Result.Success,
+				"duration":  result.Intermediate2Result.Duration,
+				"exit_code": result.Intermediate2Result.ExitCode,
+			}
+			
+			if result.Intermediate2Result.Output != "" {
+				intermediate2Info["output"] = result.Intermediate2Result.Output
+			}
+			if result.Intermediate2Result.Error != "" {
+				intermediate2Info["error"] = result.Intermediate2Result.Error
+			}
+			if len(result.Intermediate2Result.Metrics) > 0 {
+				intermediate2Info["metrics"] = result.Intermediate2Result.Metrics
+			}
+			
+			enhancedResult["intermediate2_result"] = intermediate2Info
 		}
 		
 		enhancedResults[i] = enhancedResult
@@ -254,6 +300,82 @@ func (f *Formatter) outputText(results []*coordinator.TestResult, totalDuration 
 				}
 				if result.IntermediateResult.ExitCode != 0 {
 					fmt.Printf("   Intermediate Exit Code: %d\n", result.IntermediateResult.ExitCode)
+				}
+			}
+		}
+		
+		if result.Intermediate1Result != nil {
+			fmt.Printf("   Intermediate1: %s\n", f.getStatusString(result.Intermediate1Result.Success))
+			
+			// Show intermediate1 command
+			if result.Intermediate1Command != "" {
+				fmt.Printf("   Intermediate1 Command: %s\n", result.Intermediate1Command)
+			}
+			
+			// Always show intermediate1 output if available
+			if result.Intermediate1Result.Output != "" {
+				fmt.Printf("   Intermediate1 Output:\n")
+				lines := strings.Split(result.Intermediate1Result.Output, "\n")
+				for _, line := range lines {
+					if strings.TrimSpace(line) != "" {
+						fmt.Printf("     %s\n", line)
+					}
+				}
+			}
+			
+			// Show metrics for successful runs
+			if result.Intermediate1Result.Success && len(result.Intermediate1Result.Metrics) > 0 {
+				fmt.Printf("   Intermediate1 Metrics:\n")
+				for k, v := range result.Intermediate1Result.Metrics {
+					fmt.Printf("     %s: %v\n", k, v)
+				}
+			}
+			
+			// Show detailed error info for failed runs
+			if !result.Intermediate1Result.Success {
+				if result.Intermediate1Result.Error != "" {
+					fmt.Printf("   Intermediate1 Error: %s\n", result.Intermediate1Result.Error)
+				}
+				if result.Intermediate1Result.ExitCode != 0 {
+					fmt.Printf("   Intermediate1 Exit Code: %d\n", result.Intermediate1Result.ExitCode)
+				}
+			}
+		}
+		
+		if result.Intermediate2Result != nil {
+			fmt.Printf("   Intermediate2: %s\n", f.getStatusString(result.Intermediate2Result.Success))
+			
+			// Show intermediate2 command
+			if result.Intermediate2Command != "" {
+				fmt.Printf("   Intermediate2 Command: %s\n", result.Intermediate2Command)
+			}
+			
+			// Always show intermediate2 output if available
+			if result.Intermediate2Result.Output != "" {
+				fmt.Printf("   Intermediate2 Output:\n")
+				lines := strings.Split(result.Intermediate2Result.Output, "\n")
+				for _, line := range lines {
+					if strings.TrimSpace(line) != "" {
+						fmt.Printf("     %s\n", line)
+					}
+				}
+			}
+			
+			// Show metrics for successful runs
+			if result.Intermediate2Result.Success && len(result.Intermediate2Result.Metrics) > 0 {
+				fmt.Printf("   Intermediate2 Metrics:\n")
+				for k, v := range result.Intermediate2Result.Metrics {
+					fmt.Printf("     %s: %v\n", k, v)
+				}
+			}
+			
+			// Show detailed error info for failed runs
+			if !result.Intermediate2Result.Success {
+				if result.Intermediate2Result.Error != "" {
+					fmt.Printf("   Intermediate2 Error: %s\n", result.Intermediate2Result.Error)
+				}
+				if result.Intermediate2Result.ExitCode != 0 {
+					fmt.Printf("   Intermediate2 Exit Code: %d\n", result.Intermediate2Result.ExitCode)
 				}
 			}
 		}

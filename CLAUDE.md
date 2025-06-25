@@ -98,8 +98,9 @@ This is a Go-based InfiniBand/network performance testing tool that orchestrates
 3. For each test scenario:
    - **2-node topology**: Server starts → Client connects → Results collected
    - **3-node topology**: Server starts → Intermediate starts → Client connects → Results collected
+   - **4-node topology**: Server starts → Intermediate2 starts → Intermediate1 starts → Client connects → Results collected
 4. Results formatted as JSON or human-readable text
-   - Client, server, and intermediate node results are all displayed
+   - Client, server, and all intermediate node results are displayed
    - Includes commands executed, output, metrics, and error details
 
 ## Configuration Structure
@@ -191,6 +192,15 @@ tests:
     # No intermediate - 2-node topology
     config:
       duration: 30s
+      
+  - name: "4-Node Chain Test"
+    client: "client_host"
+    intermediate1: "intermediate1_host"  # First intermediate (closest to client)
+    intermediate2: "intermediate2_host"  # Second intermediate (closest to server)
+    server: "server_host"
+    # NEW: 4-node topology with dual intermediate forwarding
+    config:
+      duration: 30s
 ```
 
 ## Sudo Support
@@ -230,6 +240,40 @@ hosts:
 - Mixed environments where some hosts require sudo and others don't
 
 See `examples/example-sudo-support.yaml` for a complete example configuration.
+
+## Topology Support
+
+The tool supports three different network topologies:
+
+- **2-node topology**: Direct client-server communication (original behavior)
+- **3-node topology**: Client → Intermediate → Server (single forwarding node)
+- **4-node topology**: Client → Intermediate1 → Intermediate2 → Server (dual forwarding chain)
+
+### 4-Node Topology
+The 4-node topology creates a chain of packet forwarding nodes between client and server:
+```
+Client → Intermediate1 → Intermediate2 → Server
+```
+
+**Configuration:**
+```yaml
+tests:
+  - name: "4-Node Chain Test"
+    client: "client_host"
+    intermediate1: "first_hop"    # Connects to intermediate2
+    intermediate2: "second_hop"   # Connects to server
+    server: "server_host"
+    config:
+      duration: 30s
+```
+
+**Execution Flow:**
+1. Server starts and listens
+2. Intermediate2 starts and connects to server
+3. Intermediate1 starts and connects to intermediate2
+4. Client starts and connects to intermediate1
+
+See `examples/example-4node-topology.yaml` for a complete 4-node configuration example.
 
 ## Adding New Test Tools
 

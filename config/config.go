@@ -51,12 +51,14 @@ type HostConfig struct {
 
 // TestScenario represents a single test scenario
 type TestScenario struct {
-	Name        string            `yaml:"name"`
-	Description string            `yaml:"description,omitempty"`
-	Client      string            `yaml:"client"` // Host name for client
-	Server      string            `yaml:"server"` // Host name for server
-	Intermediate string           `yaml:"intermediate,omitempty"` // Host name for intermediate node (optional)
-	Config      *runner.Config    `yaml:"config"`
+	Name         string            `yaml:"name"`
+	Description  string            `yaml:"description,omitempty"`
+	Client       string            `yaml:"client"` // Host name for client
+	Server       string            `yaml:"server"` // Host name for server
+	Intermediate string            `yaml:"intermediate,omitempty"` // Host name for intermediate node (optional, 3-node)
+	Intermediate1 string           `yaml:"intermediate1,omitempty"` // Host name for first intermediate node (4-node)
+	Intermediate2 string           `yaml:"intermediate2,omitempty"` // Host name for second intermediate node (4-node)
+	Config       *runner.Config    `yaml:"config"`
 	
 	// Test-specific settings
 	Repeat      int               `yaml:"repeat,omitempty"`
@@ -152,6 +154,37 @@ func (c *TestConfig) GetIntermediateHost(test *TestScenario) *HostConfig {
 // HasIntermediateNode returns true if the test scenario includes an intermediate node
 func (c *TestConfig) HasIntermediateNode(test *TestScenario) bool {
 	return test.Intermediate != ""
+}
+
+// HasFourNodeTopology returns true if the test scenario includes two intermediate nodes
+func (c *TestConfig) HasFourNodeTopology(test *TestScenario) bool {
+	return test.Intermediate1 != "" && test.Intermediate2 != ""
+}
+
+// GetTopologyType returns the topology type for a test scenario
+func (c *TestConfig) GetTopologyType(test *TestScenario) string {
+	if c.HasFourNodeTopology(test) {
+		return "4-node"
+	} else if c.HasIntermediateNode(test) {
+		return "3-node"
+	}
+	return "2-node"
+}
+
+// GetIntermediate1Host returns the first intermediate host configuration for a test
+func (c *TestConfig) GetIntermediate1Host(test *TestScenario) *HostConfig {
+	if test.Intermediate1 == "" {
+		return nil
+	}
+	return c.Hosts[test.Intermediate1]
+}
+
+// GetIntermediate2Host returns the second intermediate host configuration for a test
+func (c *TestConfig) GetIntermediate2Host(test *TestScenario) *HostConfig {
+	if test.Intermediate2 == "" {
+		return nil
+	}
+	return c.Hosts[test.Intermediate2]
 }
 
 // MergeRunnerConfig merges test-specific runner config with host-specific config

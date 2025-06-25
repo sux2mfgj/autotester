@@ -1,0 +1,61 @@
+name: "4-Node Topology Test"
+description: "Demonstrates 4-node topology with Client → Intermediate1 → Intermediate2 → Server"
+runner: "iperf3"
+timeout: 15m
+
+hosts:
+  server_node:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "server"
+    runner:
+      port: 5201
+
+  intermediate2_node:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "intermediate"
+
+  intermediate1_node:
+    ssh:
+      host: "192.168.1.102"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "intermediate"
+
+  client_node:
+    ssh:
+      host: "192.168.1.103"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+    role: "client"
+
+tests:
+  - name: "4-Node Chain Test"
+    description: "Performance test through two intermediate forwarding nodes"
+    client: "client_node"
+    intermediate1: "intermediate1_node"     # First intermediate (closest to client)
+    intermediate2: "intermediate2_node"     # Second intermediate (closest to server)
+    server: "server_node"
+    config:
+      duration: 30s
+      args:
+        parallel: 2
+        buffer_size: "64K"
+        
+  - name: "4-Node High Bandwidth Test"
+    description: "High bandwidth test through intermediate chain"
+    client: "client_node"
+    intermediate1: "intermediate1_node"
+    intermediate2: "intermediate2_node"  
+    server: "server_node"
+    config:
+      duration: 60s
+      args:
+        parallel: 4
+        buffer_size: "128K"
+        window_size: "1M"
