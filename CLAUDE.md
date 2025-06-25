@@ -191,6 +191,44 @@ tests:
       duration: 30s
 ```
 
+## Sudo Support
+
+The tool supports configurable sudo execution for remote commands on a per-host basis. This is useful when performance tools require elevated privileges or when connecting with a user that needs sudo access.
+
+**Configuration:**
+Add `use_sudo: true` to the SSH configuration for any host that requires sudo:
+
+```yaml
+hosts:
+  server_host:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+      use_sudo: true  # All commands on this host will be prefixed with 'sudo'
+    role: "server"
+    
+  client_host:
+    ssh:
+      host: "192.168.1.101"
+      user: "rootuser"  
+      key_path: "~/.ssh/id_rsa"
+      use_sudo: false  # Optional: explicitly disable sudo (default is false)
+    role: "client"
+```
+
+**Requirements:**
+- The target user must be configured for passwordless sudo access
+- The user should have sudo privileges for the performance testing tools being used
+- SSH key-based authentication is recommended for seamless operation
+
+**Use Cases:**
+- Performance tools requiring root privileges (e.g., system tuning, low-level hardware access)
+- Non-root users who need elevated privileges for specific testing operations
+- Mixed environments where some hosts require sudo and others don't
+
+See `examples/example-sudo-support.yaml` for a complete example configuration.
+
 ## Adding New Test Tools
 
 To add support for a new performance test tool:

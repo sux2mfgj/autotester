@@ -20,6 +20,7 @@ type Config struct {
 	Password        string        `yaml:"password,omitempty"`
 	ConnectTimeout  time.Duration `yaml:"connect_timeout"`
 	CommandTimeout  time.Duration `yaml:"command_timeout"`
+	UseSudo         bool          `yaml:"use_sudo,omitempty"`
 }
 
 // Client wraps SSH client functionality
@@ -106,6 +107,11 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (*Result, e
 		return nil, fmt.Errorf("not connected")
 	}
 	
+	// Wrap command with sudo if configured
+	if c.config.UseSudo {
+		command = fmt.Sprintf("sudo %s", command)
+	}
+	
 	// Create session
 	session, err := c.client.NewSession()
 	if err != nil {
@@ -152,6 +158,11 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (*Result, e
 func (c *Client) ExecuteCommandAsync(ctx context.Context, command string) error {
 	if c.client == nil {
 		return fmt.Errorf("not connected")
+	}
+	
+	// Wrap command with sudo if configured
+	if c.config.UseSudo {
+		command = fmt.Sprintf("sudo %s", command)
 	}
 	
 	session, err := c.client.NewSession()

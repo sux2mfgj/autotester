@@ -1,0 +1,51 @@
+name: "Sudo Support Example"
+description: "Demonstrates configurable sudo support for remote command execution"
+runner: "iperf3"
+timeout: 10m
+
+hosts:
+  server_node:
+    ssh:
+      host: "192.168.1.100"
+      user: "testuser"
+      key_path: "~/.ssh/id_rsa"
+      use_sudo: true  # Enable sudo for all commands on this host
+    role: "server"
+    runner:
+      port: 5201
+
+  client_node:
+    ssh:
+      host: "192.168.1.101"
+      user: "testuser" 
+      key_path: "~/.ssh/id_rsa"
+      use_sudo: false  # Explicitly disable sudo (optional, false is default)
+    role: "client"
+
+  privileged_node:
+    ssh:
+      host: "192.168.1.102"
+      user: "lowprivuser"
+      key_path: "~/.ssh/id_rsa"
+      use_sudo: true  # This user needs sudo to run performance tools
+    role: "client"
+
+tests:
+  - name: "Standard Test (no sudo required)"
+    description: "Regular test between server with sudo and client without sudo"
+    client: "client_node"
+    server: "server_node"
+    config:
+      duration: 30s
+      args:
+        parallel: 4
+        
+  - name: "Privileged Test (sudo required)"
+    description: "Test using privileged client that requires sudo"
+    client: "privileged_node"
+    server: "server_node" 
+    config:
+      duration: 30s
+      args:
+        parallel: 1
+        buffer_size: "128K"

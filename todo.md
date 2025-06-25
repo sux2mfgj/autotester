@@ -18,3 +18,14 @@ We currently have a function to manage and execute performance measurements betw
 - Multiple test scenarios (single/multi-stream, TCP/UDP)
 - High-performance configuration options
 - Baseline comparison without DPDK forwarder
+
+- [x] `sudo` support at remote host as configurable
+
+**COMPLETED**: Implemented configurable sudo support for remote hosts with the following features:
+- Added `use_sudo` field to SSH configuration structure
+- Commands are automatically prefixed with `sudo` when `use_sudo: true` is set
+- Applied to both `ExecuteCommand` and `ExecuteCommandAsync` methods
+- Per-host configuration allows mixed environments (some hosts with sudo, others without)
+- Documentation added to CLAUDE.md with configuration examples and requirements
+- Example configuration file created at `examples/example-sudo-support.yaml`
+- Backward compatible with existing configurations (default is `use_sudo: false`)
