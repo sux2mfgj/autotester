@@ -99,6 +99,8 @@ This is a Go-based InfiniBand/network performance testing tool that orchestrates
    - **2-node topology**: Server starts → Client connects → Results collected
    - **3-node topology**: Server starts → Intermediate starts → Client connects → Results collected
 4. Results formatted as JSON or human-readable text
+   - Client, server, and intermediate node results are all displayed
+   - Includes commands executed, output, metrics, and error details
 
 ## Configuration Structure
 

@@ -50,6 +50,9 @@ func (f *Formatter) outputJSON(results []*coordinator.TestResult, totalDuration 
 		if result.ServerCommand != "" {
 			enhancedResult["server_command"] = result.ServerCommand
 		}
+		if result.IntermediateCommand != "" {
+			enhancedResult["intermediate_command"] = result.IntermediateCommand
+		}
 		
 		if result.Error != "" {
 			enhancedResult["error"] = result.Error
@@ -93,6 +96,26 @@ func (f *Formatter) outputJSON(results []*coordinator.TestResult, totalDuration 
 			}
 			
 			enhancedResult["server_result"] = serverInfo
+		}
+		
+		if result.IntermediateResult != nil {
+			intermediateInfo := map[string]interface{}{
+				"success":   result.IntermediateResult.Success,
+				"duration":  result.IntermediateResult.Duration,
+				"exit_code": result.IntermediateResult.ExitCode,
+			}
+			
+			if result.IntermediateResult.Output != "" {
+				intermediateInfo["output"] = result.IntermediateResult.Output
+			}
+			if result.IntermediateResult.Error != "" {
+				intermediateInfo["error"] = result.IntermediateResult.Error
+			}
+			if len(result.IntermediateResult.Metrics) > 0 {
+				intermediateInfo["metrics"] = result.IntermediateResult.Metrics
+			}
+			
+			enhancedResult["intermediate_result"] = intermediateInfo
 		}
 		
 		enhancedResults[i] = enhancedResult
@@ -193,6 +216,44 @@ func (f *Formatter) outputText(results []*coordinator.TestResult, totalDuration 
 				}
 				if result.ServerResult.ExitCode != 0 {
 					fmt.Printf("   Server Exit Code: %d\n", result.ServerResult.ExitCode)
+				}
+			}
+		}
+		
+		if result.IntermediateResult != nil {
+			fmt.Printf("   Intermediate: %s\n", f.getStatusString(result.IntermediateResult.Success))
+			
+			// Show intermediate command
+			if result.IntermediateCommand != "" {
+				fmt.Printf("   Intermediate Command: %s\n", result.IntermediateCommand)
+			}
+			
+			// Always show intermediate output if available
+			if result.IntermediateResult.Output != "" {
+				fmt.Printf("   Intermediate Output:\n")
+				lines := strings.Split(result.IntermediateResult.Output, "\n")
+				for _, line := range lines {
+					if strings.TrimSpace(line) != "" {
+						fmt.Printf("     %s\n", line)
+					}
+				}
+			}
+			
+			// Show metrics for successful runs
+			if result.IntermediateResult.Success && len(result.IntermediateResult.Metrics) > 0 {
+				fmt.Printf("   Intermediate Metrics:\n")
+				for k, v := range result.IntermediateResult.Metrics {
+					fmt.Printf("     %s: %v\n", k, v)
+				}
+			}
+			
+			// Show detailed error info for failed runs
+			if !result.IntermediateResult.Success {
+				if result.IntermediateResult.Error != "" {
+					fmt.Printf("   Intermediate Error: %s\n", result.IntermediateResult.Error)
+				}
+				if result.IntermediateResult.ExitCode != 0 {
+					fmt.Printf("   Intermediate Exit Code: %d\n", result.IntermediateResult.ExitCode)
 				}
 			}
 		}
